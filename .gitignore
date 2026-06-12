@@ -1,0 +1,74 @@
+# ======================
+# 환경변수 (API 키 포함 — 절대 커밋 금지)
+# ======================
+.env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+backend/.env
+ai/.env
+
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+*.egg
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+pip-wheel-metadata/
+
+# ======================
+# Node / pnpm
+# ======================
+node_modules/
+frontend/node_modules/
+.pnpm-store/
+frontend/.pnpm-store/
+
+# ======================
+# Vite 빌드 결과물
+# ======================
+frontend/dist/
+frontend/.vite/
+
+# ======================
+# Docker
+# ======================
+*.log
+docker-compose.local.yml
+
+# ======================
+# IDE
+# ======================
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swa
+
+# ======================
+# macOS
+# ======================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ======================
+# 기타
+# ======================
+*.bak
+*.tmp
