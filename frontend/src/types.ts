@@ -1,7 +1,6 @@
 // 백엔드·엔진 응답 타입. routes[] 는 엔진 RouteOut(engine/app/routes/schemas.py)과 1:1 이다.
 
 export type ProfileId = 'wheelchair' | 'elderly' | 'walking_aid' | 'visually_impaired'
-export type WeatherMode = 'auto' | 'manual' | 'none'
 export type WeatherFlag = 'heat' | 'heatwave' | 'cold' | 'coldwave' | 'rain' | 'bad_air' | 'windy'
 
 export type LatLng = { lat: number; lng: number }
@@ -121,30 +120,22 @@ export type SearchMetadata = {
   profile_label: string
   weather_flags: string[]
   departure_at: string | null
-  corridor_nodes: number
-  corridor_edges: number
-  blocked_edges: number
-  snap_origin_m: number
-  snap_destination_m: number
+  preferences?: { avoid_slope: boolean; prefer_shade: boolean }
   shade_status: string
   shade_note: string
-  solar_elevation_deg: number | null
   building_height_coverage: number | null
   elevation_resolution_m: number
-  aco: Record<string, unknown>
-  ga: Record<string, unknown>
-  archive_size: number
   elapsed_ms: number
   backend_elapsed_ms?: number
+  [key: string]: unknown
 }
 
 export type RouteSearchRequest = {
   origin: LatLng & { name: string }
   destination: LatLng & { name: string }
   profile: ProfileId
-  departure_at: string | null
-  weather_mode: WeatherMode
-  manual_weather?: Partial<Record<WeatherFlag, boolean>>
+  prefer_shade: boolean
+  departure_at?: string | null
   options?: { k?: number; time_budget_s?: number; seed?: number }
 }
 
@@ -152,6 +143,7 @@ export type RouteSearchResponse = {
   request_id: string
   profile: ProfileId
   departure_at: string | null
+  prefer_shade: boolean
   weather: Weather
   routes: Route[]
   metadata: SearchMetadata

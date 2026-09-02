@@ -30,7 +30,7 @@ def test_search_returns_three_distinct_valid_routes(store, profile):
         if profile == "wheelchair":
             assert r.features.stairs_count == 0
             assert all(leg.facility in ("elevator", "unknown") for leg in r.legs if leg.kind == "vertical")
-    assert res.metadata.shade_status == "disabled"
+    assert res.metadata.shade_status in ("computed", "not_daylight")
     assert res.metadata.elevation_resolution_m == 90
 
 

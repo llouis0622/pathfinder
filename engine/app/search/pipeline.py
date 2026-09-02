@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import replace
+from datetime import datetime
 
 import numpy as np
 
@@ -10,6 +11,7 @@ from ..cost.model import compute_costs, route_cost
 from ..cost.profiles import get_profile
 from ..cost.weather import WeatherContext
 from ..features.shade import edge_shade_ratios
+from ..features.solar import KST
 from ..graph.corridor import CorridorSpec
 from ..graph.store import GraphStore, SnapError
 from ..routes.builder import assign_badges, build_route
@@ -67,12 +69,15 @@ def search_routes(
     o_idx = sub.id_to_index[o.node_id]
     d_idx = sub.id_to_index[d.node_id]
 
-    # 3. 그늘
-    buildings = store.buildings_in(spec.bbox(spec.walk_axis_m)) if request.departure_at else []
-    shade, shade_info = edge_shade_ratios(sub, buildings, request.departure_at)
+    # 3. 그늘 (출발 시각이 없으면 지금)
+    departure_at = request.departure_at or datetime.now(KST)
+    buildings = store.buildings_in(spec.bbox(spec.walk_axis_m))
+    shade, shade_info = edge_shade_ratios(sub, buildings, departure_at)
 
     # 4. 비용, 5. cost-to-go
-    cost = compute_costs(sub, profile, weather, shade)
+    prefs = request.preferences
+    cost = compute_costs(sub, profile, weather, shade, avoid_slope=prefs.avoid_slope, prefer_shade=prefs.prefer_shade,
+                         shade_available=(shade_info.status == "computed"))
     h = cost_to_go(sub, cost.cost, d_idx)
     if not np.isfinite(h[o_idx]):
         raise NoRouteError(f"{profile.label} 조건으로 통과 가능한 경로가 없습니다 (차단 엣지 {cost.n_blocked}개).")
@@ -113,7 +118,7 @@ def search_routes(
 
     metadata = SearchMetadata(
         profile=profile.id, profile_label=profile.label, weather_flags=weather.active_flags(),
-        departure_at=(request.departure_at.isoformat() if request.departure_at else None),
+        departure_at=departure_at.isoformat(), preferences=prefs.model_dump(),
         corridor_nodes=sub.num_nodes, corridor_edges=sub.num_edges, blocked_edges=cost.n_blocked,
         snap_origin_m=round(o.distance_m, 1), snap_destination_m=round(d.distance_m, 1),
         shade_status=shade_info.status, shade_note=shade_info.note, solar_elevation_deg=shade_info.solar_elevation_deg,

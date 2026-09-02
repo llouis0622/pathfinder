@@ -26,10 +26,10 @@ t0 = length_m / speed
 
 | 프로필 | 오르막 계수 a_up | 내리막 계수 a_down | 소프트 임계 | 하드 차단 |
 |---|---|---|---|---|
-| wheelchair | 0.25 | 0.10 | 6 % | > 10 % |
-| elderly | 0.12 | 0.05 | 8 % | 없음 |
-| walking_aid | 0.15 | 0.10 | 8 % | 없음 |
-| visually_impaired | 0.08 | 0.03 | 10 % | 없음 |
+| wheelchair | 0.25 | 0.10 | 5 % | > 10 % |
+| elderly | 0.12 | 0.05 | 6 % | 없음 |
+| walking_aid | 0.15 | 0.10 | 6 % | 없음 |
+| visually_impaired | 0.08 | 0.03 | 8 % | 없음 |
 
 ```
 g = |grade_pct|
@@ -74,6 +74,17 @@ if g > soft_threshold: t += length_m * 1.5  # 급경사 추가 부담(초/m)
 ### 점자블록 (`tactile_paving`)
 
 visually_impaired: `tactile_paving=True`이면 ×0.85, 명시적으로 `False`이고 `footway=sidewalk`면 ×1.15.
+
+### 선호 (`preferences`)
+
+교통약자 서비스이므로 **경사 회피는 기본값(켬)** 이다. 그늘 우선만 사용자가 선택한다.
+
+| 선호 | 기본 | 효과 (보행 엣지 비용) |
+|---|---|---|
+| `avoid_slope` | 켬 | `cost *= 1 + slope_avoid_gain × max(|grade|, max_grade)` (wheelchair 0.14 / elderly 0.10 / walking_aid 0.12 / vi 0.06 per %) |
+| `prefer_shade` | 끔 | 실외 엣지 `cost *= 1 + 0.6 × (1 − shade_ratio)`. 그늘 계산이 된 요청(주간·건물 정보 있음)에서만 작동 |
+
+두 선호 모두 이동 시간(`time_s`)은 바꾸지 않고 순위에 쓰는 비용만 바꾼다.
 
 ## 날씨 수정자 (실외 엣지에만 적용, `indoor=False`)
 

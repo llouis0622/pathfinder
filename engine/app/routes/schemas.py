@@ -28,12 +28,20 @@ class SearchOptions(BaseModel):
     use_ga: bool = True
 
 
+class Preferences(BaseModel):
+    """탐색 선호. 교통약자 서비스이므로 경사 회피는 기본으로 켠다."""
+
+    avoid_slope: bool = Field(default=True, description="완만한 경사를 우선 (모든 보행 엣지에 경사 비례 비용 가중)")
+    prefer_shade: bool = Field(default=False, description="그늘 우선 (날씨와 무관하게 그늘 없는 보행 구간 비용 가중)")
+
+
 class SearchRequest(BaseModel):
     origin: LatLng
     destination: LatLng
     profile: ProfileId
-    departure_at: datetime | None = None
+    departure_at: datetime | None = Field(default=None, description="없으면 현재 시각(KST) 기준으로 그늘을 계산")
     weather: WeatherContext | None = None
+    preferences: Preferences = Field(default_factory=Preferences)
     options: SearchOptions = Field(default_factory=SearchOptions)
 
 
@@ -126,6 +134,7 @@ class SearchMetadata(BaseModel):
     blocked_edges: int
     snap_origin_m: float
     snap_destination_m: float
+    preferences: dict
     shade_status: str
     shade_note: str
     solar_elevation_deg: float | None

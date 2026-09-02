@@ -1,47 +1,61 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import RouteCard from '../components/RouteCard'
+import ProfileChips from '../components/ProfileChips'
 import RouteDetail from '../components/RouteDetail'
+import RouteRow from '../components/RouteRow'
 import SchematicMap from '../components/SchematicMap'
-import WeatherChip from '../components/WeatherChip'
+import { PROFILE_FALLBACK } from '../lib/format'
 import { response, walkRoute } from './fixtures'
 
-describe('RouteCard', () => {
-  it('renders badges, metrics and cautions', () => {
+describe('RouteRow', () => {
+  it('shows duration, mode bar, summary, tags and the first caution', () => {
     const onSelect = vi.fn()
-    render(<RouteCard route={walkRoute} selected={false} onSelect={onSelect} shadeAvailable />)
-    expect(screen.getByText('1순위')).toBeInTheDocument()
-    expect(screen.getByText('가장 빠른 길')).toBeInTheDocument()
-    expect(screen.getByText('엘리베이터 확인됨')).toBeInTheDocument()
-    expect(screen.getByText('674m')).toBeInTheDocument()
-    expect(screen.getByText('12%')).toBeInTheDocument()
+    const { container } = render(<RouteRow route={walkRoute} selected={false} onSelect={onSelect} />)
+    expect(screen.getByText('22')).toBeInTheDocument()
+    expect(screen.getByText('추천')).toBeInTheDocument()
+    expect(screen.getByText('도보 674m')).toBeInTheDocument()
+    expect(screen.getByText('도보 6분 · 1호선 3정거장 · 도보 6분')).toBeInTheDocument()
+    expect(screen.getByText('빠름')).toBeInTheDocument()
+    expect(screen.getByText('계단 없음')).toBeInTheDocument()
     expect(screen.getByText(/더위 주의/)).toBeInTheDocument()
+    expect(container.querySelectorAll('.bar__seg')).toHaveLength(3)   // 수직 이동 제외
     fireEvent.click(screen.getByRole('option'))
     fireEvent.keyDown(screen.getByRole('option'), { key: 'Enter' })
     expect(onSelect).toHaveBeenCalledTimes(2)
   })
 
-  it('hides shade when not computed', () => {
-    render(<RouteCard route={walkRoute} selected onSelect={() => undefined} shadeAvailable={false} />)
-    expect(screen.getByText('—')).toBeInTheDocument()
+  it('shows transfers without a recommend badge for lower ranks', () => {
+    render(<RouteRow route={response.routes[1]} selected onSelect={() => undefined} />)
+    expect(screen.queryByText('추천')).not.toBeInTheDocument()
+    expect(screen.getByText('환승 1회')).toBeInTheDocument()
   })
 })
 
 describe('RouteDetail', () => {
-  it('lists legs with mode-specific meta', () => {
-    render(<RouteDetail route={walkRoute} />)
-    expect(screen.getByText('도보 300m · 6분')).toBeInTheDocument()
-    expect(screen.getByText('엘리베이터 이용 확인됨 · 2분')).toBeInTheDocument()
-    expect(screen.getByText('A역 → D역')).toBeInTheDocument()
+  it('renders a timeline with stations, walks and elevator warnings', () => {
+    const onBack = vi.fn()
+    render(<RouteDetail route={walkRoute} originName="집" destinationName="회사" onBack={onBack} />)
+    expect(screen.getByText('집')).toBeInTheDocument()
+    expect(screen.getByText('회사')).toBeInTheDocument()
+    expect(screen.getAllByText('A역').length).toBeGreaterThan(0)
+    expect(screen.getByText('1호선 · 3정거장 · 7분')).toBeInTheDocument()
+    expect(screen.getByText(/300m · 경사 4%/)).toBeInTheDocument()
+    expect(screen.getByText(/D역 · 엘리베이터 확인 필요/)).toHaveClass('is-warn')
+    fireEvent.click(screen.getByRole('button', { name: '경로 목록으로' }))
+    expect(onBack).toHaveBeenCalled()
   })
 })
 
-describe('WeatherChip', () => {
-  it('shows source, flags and shade status', () => {
-    render(<WeatherChip weather={response.weather} metadata={response.metadata} />)
-    expect(screen.getByText(/Open-Meteo · 체감 34℃ · PM10 40/)).toBeInTheDocument()
-    expect(screen.getByText('폭염')).toBeInTheDocument()
-    expect(screen.getByText(/건물 그늘 계산됨 · 높이 정보 97%/)).toBeInTheDocument()
+describe('ProfileChips', () => {
+  it('selects a profile and toggles shade preference', () => {
+    const onSelect = vi.fn()
+    const onToggle = vi.fn()
+    render(<ProfileChips profiles={PROFILE_FALLBACK} selected="wheelchair" onSelect={onSelect} preferShade={false} onToggleShade={onToggle} />)
+    expect(screen.getByRole('radio', { name: '휠체어' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('radio', { name: '고령자' }))
+    expect(onSelect).toHaveBeenCalledWith('elderly')
+    fireEvent.click(screen.getByRole('button', { name: '그늘 우선' }))
+    expect(onToggle).toHaveBeenCalled()
   })
 })
 
@@ -58,8 +72,8 @@ describe('SchematicMap', () => {
     expect(onSelect).toHaveBeenCalledWith('route_2')
   })
 
-  it('shows a hint when nothing to draw', () => {
+  it('renders an empty state when nothing to draw', () => {
     render(<SchematicMap origin={null} destination={null} routes={[]} selectedId={null} overlay="mode" onSelect={() => undefined} />)
-    expect(screen.getByText(/길찾기를 누르면/)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '지도' })).toBeInTheDocument()
   })
 })

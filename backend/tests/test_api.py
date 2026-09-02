@@ -44,7 +44,7 @@ def test_weather_current_and_forecast(client, external):
     assert set(future["flags"]) >= {"cold", "windy", "bad_air"} and future["sky"] == "snow" and "rain" in future["flags"]
 
 
-def test_manual_weather_wins_over_provider_none(external):
+def test_provider_none_gives_no_flags(external):
     from fastapi.testclient import TestClient
 
     from app.config import Settings
@@ -52,9 +52,8 @@ def test_manual_weather_wins_over_provider_none(external):
 
     cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", weather_provider="none")
     with TestClient(create_app(cfg)) as c:
-        body = dict(ROUTE_BODY, weather_mode="manual", manual_weather={"rain": True})
-        assert c.post("/api/route", json=body).json()["weather"]["flags"] == ["rain"]
-        assert c.post("/api/route", json=ROUTE_BODY).json()["weather"]["source"] == "none"
+        data = c.post("/api/route", json=ROUTE_BODY).json()
+        assert data["weather"]["source"] == "none" and data["weather"]["flags"] == []
 
 
 def test_weather_failure_is_soft(client, external):
@@ -80,16 +79,16 @@ def test_route_search_stores_and_returns(client, external):
     assert s["routes"][0]["rank"] == 1 and "badges" in s["routes"][0]
 
 
-def test_route_manual_weather_and_none(client, external):
-    body = dict(ROUTE_BODY, weather_mode="manual", manual_weather={"heatwave": True, "rain": True})
-    r = client.post("/api/route", json=body)
+def test_route_prefer_shade_and_default_departure(client, external):
+    r = client.post("/api/route", json={**{k: v for k, v in ROUTE_BODY.items() if k != "departure_at"}, "prefer_shade": True})
     assert r.status_code == 200
     sent = external.engine_calls[-1]
-    assert sent["weather"]["flags_explicit"] is True and sent["weather"]["heatwave"] and sent["weather"]["heat"] and sent["weather"]["rain"]
-    assert r.json()["weather"]["source"] == "manual"
-    body = dict(ROUTE_BODY, weather_mode="none")
-    r = client.post("/api/route", json=body)
-    assert r.json()["weather"]["source"] == "none"
+    assert sent["preferences"] == {"avoid_slope": True, "prefer_shade": True}
+    assert sent["departure_at"] is not None and sent["departure_at"].endswith("+09:00")
+    assert r.json()["prefer_shade"] is True and r.json()["departure_at"] is not None
+    r = client.post("/api/route", json=ROUTE_BODY)
+    assert external.engine_calls[-1]["preferences"]["prefer_shade"] is False
+    assert r.json()["prefer_shade"] is False
 
 
 def test_route_no_route_and_engine_down(client, external):

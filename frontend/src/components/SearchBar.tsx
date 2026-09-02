@@ -3,7 +3,7 @@ import { searchPlaces } from '../api'
 import type { Place } from '../types'
 
 type Props = {
-  label: string
+  kind: 'origin' | 'destination'
   placeholder: string
   value: Place | null
   near?: { lat: number; lng: number } | null
@@ -11,14 +11,17 @@ type Props = {
   allowCurrentLocation?: boolean
 }
 
-export default function SearchBar({ label, placeholder, value, near, onSelect, allowCurrentLocation }: Props) {
-  const [query, setQuery] = useState('')
+export default function SearchBar({ kind, placeholder, value, near, onSelect, allowCurrentLocation }: Props) {
+  const [query, setQuery] = useState(value?.name ?? '')
   const [results, setResults] = useState<Place[]>([])
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [active, setActive] = useState(-1)
   const listId = useId()
   const timer = useRef<number | null>(null)
+
+  useEffect(() => {
+    setQuery(value?.name ?? '')
+  }, [value])
 
   useEffect(() => {
     if (timer.current) window.clearTimeout(timer.current)
@@ -28,7 +31,6 @@ export default function SearchBar({ label, placeholder, value, near, onSelect, a
       return
     }
     timer.current = window.setTimeout(async () => {
-      setLoading(true)
       try {
         const res = await searchPlaces(q, near ?? undefined)
         setResults(res.places)
@@ -36,10 +38,8 @@ export default function SearchBar({ label, placeholder, value, near, onSelect, a
         setActive(-1)
       } catch {
         setResults([])
-      } finally {
-        setLoading(false)
       }
-    }, 300)
+    }, 250)
     return () => {
       if (timer.current) window.clearTimeout(timer.current)
     }
@@ -59,38 +59,37 @@ export default function SearchBar({ label, placeholder, value, near, onSelect, a
   }
 
   return (
-    <div className="search">
-      <label className="search__label">{label}</label>
-      <div className="search__row">
-        <input
-          className="search__input"
-          type="text"
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          placeholder={placeholder}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            if (value) onSelect(null)
-          }}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-          onKeyDown={(e) => {
-            if (!open) return
-            if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)) }
-            if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
-            if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(results[active]) }
-            if (e.key === 'Escape') setOpen(false)
-          }}
-        />
-        {allowCurrentLocation && (
-          <button type="button" className="btn btn--ghost" onClick={useCurrentLocation} title="현재 위치 사용" aria-label="현재 위치 사용">📍</button>
-        )}
-      </div>
-      {loading && <span className="search__hint">검색 중…</span>}
-      {value && <span className="search__hint">{value.address || value.category || value.source}</span>}
+    <div className={`search search--${kind}`}>
+      <span className="search__dot" aria-hidden="true" />
+      <input
+        className="search__input"
+        type="text"
+        role="combobox"
+        aria-label={kind === 'origin' ? '출발지' : '도착지'}
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          if (value) onSelect(null)
+        }}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (!open) return
+          if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)) }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
+          if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(results[active]) }
+          if (e.key === 'Escape') setOpen(false)
+        }}
+      />
+      {allowCurrentLocation && !value && (
+        <button type="button" className="search__loc" onClick={useCurrentLocation} aria-label="현재 위치 사용">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="8" /></svg>
+        </button>
+      )}
       {open && results.length > 0 && (
         <ul id={listId} className="search__list" role="listbox">
           {results.map((p, i) => (

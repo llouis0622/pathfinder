@@ -57,8 +57,9 @@ cd ../frontend && npm install && npm run typecheck && npm test        # vitest +
 - `src/types.ts`: 엔진 `RouteOut` 과 1:1 인 타입. 백엔드가 경로를 그대로 전달하므로 이 파일만 맞추면 된다.
 - `src/components/MapView.tsx`: Kakao 지도. 선택 경로를 구간별 색(도보·지하철·버스)으로 그리고, "경사"/"그늘" 오버레이는 보행 구간을 경사 등급·그늘 비율로 칠한다.
   키가 없으면 `SchematicMap.tsx`(SVG 약식 지도)로 자동 대체된다.
-- `src/components/RouteCard.tsx`, `RouteDetail.tsx`: 배지(가장 빠른 길·경사가 가장 완만한 길·그늘이 가장 많은 길·계단 없음·엘리베이터 확인됨 등), 주의사항, 구간 안내.
-- `src/components/ConditionsPanel.tsx`: 출발 시각(그늘·예보 기준), 날씨 반영 방식(자동/직접 지정/반영 안 함).
+- `src/components/RouteRow.tsx`, `RouteDetail.tsx`: 네이버·카카오 길찾기식 경로 행(소요시간·수단 바·요약·태그)과 세로 타임라인 상세.
+- `src/components/ProfileChips.tsx`: 이용자 유형 4종 칩과 "그늘 우선" 토글. 날씨는 선택 없이 실시간으로 반영되고, 경사 회피는 항상 켜져 있다.
+- 디자인: 화이트·블랙·그레이 톤(토스 스타일), 지하철 노선색만 정보 표시용으로 유지.
 
 합성 격자 도시(`data/samples/grid_city.npz`)로 엔진 전체를 검증한다. 실제 부산 그래프 빌드는
 [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md)를 따른다.

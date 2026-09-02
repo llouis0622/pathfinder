@@ -7,13 +7,12 @@ describe('api client', () => {
   it('posts route requests to /api/route', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ routes: [] }), { status: 200 }))
     await searchRoutes({
-      origin: { lat: 1, lng: 2, name: 'a' }, destination: { lat: 3, lng: 4, name: 'b' }, profile: 'elderly',
-      departure_at: null, weather_mode: 'manual', manual_weather: { rain: true },
+      origin: { lat: 1, lng: 2, name: 'a' }, destination: { lat: 3, lng: 4, name: 'b' }, profile: 'elderly', prefer_shade: true,
     })
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toBe('/api/route')
     expect(init?.method).toBe('POST')
-    expect(JSON.parse(String(init?.body))).toMatchObject({ profile: 'elderly', weather_mode: 'manual', manual_weather: { rain: true } })
+    expect(JSON.parse(String(init?.body))).toMatchObject({ profile: 'elderly', prefer_shade: true })
   })
 
   it('encodes place queries and surfaces backend detail on errors', async () => {
