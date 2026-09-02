@@ -99,7 +99,7 @@ pathfinder/
 ├── backend/
 │   ├── app/{main,config,database,models,schemas,routers,http}.py, services/{weather,places,engine_client,route}.py
 │   └── tests/
-├── frontend/src/{api,components,hooks,pages,types}
+├── frontend/src/{api.ts,types.ts,App.tsx,components/,hooks/,lib/,test/}
 ├── data/               # DEM, 지하철 CSV, 버스 정류장 CSV, 경계, 샘플 그래프
 ├── docs/               # 이 문서들
 └── docker-compose.yml

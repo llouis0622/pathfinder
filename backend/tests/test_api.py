@@ -44,6 +44,19 @@ def test_weather_current_and_forecast(client, external):
     assert set(future["flags"]) >= {"cold", "windy", "bad_air"} and future["sky"] == "snow" and "rain" in future["flags"]
 
 
+def test_manual_weather_wins_over_provider_none(external):
+    from fastapi.testclient import TestClient
+
+    from app.config import Settings
+    from app.main import create_app
+
+    cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", weather_provider="none")
+    with TestClient(create_app(cfg)) as c:
+        body = dict(ROUTE_BODY, weather_mode="manual", manual_weather={"rain": True})
+        assert c.post("/api/route", json=body).json()["weather"]["flags"] == ["rain"]
+        assert c.post("/api/route", json=ROUTE_BODY).json()["weather"]["source"] == "none"
+
+
 def test_weather_failure_is_soft(client, external):
     external.open_meteo_fail = True
     w = client.get("/api/weather", params={"lat": 35.15, "lng": 129.06}).json()

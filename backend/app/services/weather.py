@@ -164,10 +164,10 @@ def manual_weather(flags: ManualWeather | None) -> WeatherOut:
 
 async def get_weather(cfg: Settings, lat: float, lng: float, at: datetime | None = None, mode: str = "auto",
                       manual: ManualWeather | None = None) -> WeatherOut:
-    if mode == "none" or cfg.weather_provider == "none":
-        return WeatherOut(source="none", note="날씨를 반영하지 않습니다")
     if mode == "manual":
         return manual_weather(manual)
+    if mode == "none" or cfg.weather_provider == "none":
+        return WeatherOut(source="none", note="날씨를 반영하지 않습니다")
     target = _target_hour(at)
     cache_key = (cfg.weather_provider, round(lat, 2), round(lng, 2), target.isoformat() if target else None)
     now = time.monotonic()
