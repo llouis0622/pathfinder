@@ -40,6 +40,7 @@ EDGE_FIELDS: tuple[tuple[str, str, Any], ...] = (
     ("length_m", "float32", 0.0),
     ("time_s", "float32", np.nan),
     ("grade_pct", "float32", np.nan),
+    ("max_grade_pct", "float32", np.nan),
     ("stairs", "int8", TRI_FALSE),
     ("step_count", "float32", np.nan),
     ("ramp", "int8", TRI_UNKNOWN),
@@ -149,6 +150,16 @@ class Graph:
             geom_offsets = np.asarray(offsets, dtype=np.int64)
             geom_coords = np.asarray(coords, dtype=np.float64).reshape(-1, 2)
         return cls(node_arrays, edge_arrays, geom_offsets, geom_coords)
+
+    @staticmethod
+    def arrays_from_records(nodes: Iterable[dict], edges: Iterable[dict]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+        """검증 없이 레코드를 배열로 바꾼다 (다른 그래프의 노드를 참조하는 엣지 조각을 만들 때)."""
+        node_records = list(nodes)
+        edge_records = list(edges)
+        return (
+            {name: _column(node_records, name, dtype, default) for name, dtype, default in NODE_FIELDS},
+            {name: _column(edge_records, name, dtype, default) for name, dtype, default in EDGE_FIELDS},
+        )
 
     @classmethod
     def empty(cls) -> "Graph":

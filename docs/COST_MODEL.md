@@ -22,6 +22,8 @@ t0 = length_m / speed
 
 ### 경사 (grade_pct, u→v 방향 부호)
 
+이동 시간 계수는 순 경사 `grade_pct`, 소프트 임계·하드 차단 판정은 `max(|grade_pct|, max_grade_pct)`(엣지 안 45 m 표본 구간의 최대 경사)를 쓴다.
+
 | 프로필 | 오르막 계수 a_up | 내리막 계수 a_down | 소프트 임계 | 하드 차단 |
 |---|---|---|---|---|
 | wheelchair | 0.25 | 0.10 | 6 % | > 10 % |
