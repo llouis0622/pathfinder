@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, chooseRoute, fetchProfiles, searchRoutes } from './api'
 import AuthMenu from './components/AuthMenu'
 import MapView from './components/MapView'
@@ -8,9 +8,12 @@ import RouteRow from './components/RouteRow'
 import SearchBar from './components/SearchBar'
 import { useAuth } from './hooks/useAuth'
 import { PROFILE_FALLBACK, weatherLine } from './lib/format'
-import type { MapOverlay, Place, Profile, ProfileId, RouteSearchResponse } from './types'
+import type { MapInset, MapOverlay, Place, Profile, ProfileId, RouteSearchResponse } from './types'
 
 type View = 'search' | 'list' | 'detail'
+
+const ZERO_INSET: MapInset = { top: 0, right: 0, bottom: 0, left: 0 }
+const MOBILE_QUERY = '(max-width: 860px)'
 
 export default function App() {
   const auth = useAuth()
@@ -28,6 +31,32 @@ export default function App() {
   const [choosing, setChoosing] = useState(false)
   const [chosenId, setChosenId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(true)
+  const [inset, setInset] = useState<MapInset>(ZERO_INSET)
+  const dockRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  const sheetRef = useRef<HTMLElement>(null)
+
+  // 패널·시트가 지도를 얼마나 덮는지 재서, 지도가 '보이는 창' 안에 경로를 맞추게 한다
+  useEffect(() => {
+    const measure = () => {
+      const mobile = window.matchMedia(MOBILE_QUERY).matches
+      const panel = panelRef.current?.getBoundingClientRect()
+      const sheet = sheetRef.current?.getBoundingClientRect()
+      const dock = dockRef.current?.getBoundingClientRect()
+      const next: MapInset = mobile
+        ? { top: panel && panel.height > 0 ? Math.round(panel.bottom) : 0, right: 0, bottom: sheet ? Math.max(0, Math.round(window.innerHeight - sheet.top)) : 0, left: 0 }
+        : { top: 0, right: 0, bottom: 0, left: dock ? Math.round(dock.right) : 0 }
+      setInset((prev) => (prev.top === next.top && prev.right === next.right && prev.bottom === next.bottom && prev.left === next.left ? prev : next))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    ;[panelRef.current, sheetRef.current, dockRef.current].forEach((el) => el && ro?.observe(el))
+    // 바텀시트 높이 전환(.2s) 이 끝난 뒤 값으로 한 번 더 맞춘다
+    const t = window.setTimeout(measure, 260)
+    return () => { window.removeEventListener('resize', measure); ro?.disconnect(); window.clearTimeout(t) }
+  }, [result, view, sheetOpen])
 
   useEffect(() => {
     fetchProfiles().then((list) => list.length && setProfiles(list)).catch(() => undefined)
@@ -57,6 +86,7 @@ export default function App() {
       setSelectedId(res.routes[0]?.id ?? null)
       setChosenId(null)
       setView('list')
+      setSheetOpen(true)
     } catch (e) {
       setResult(null)
       setError(e instanceof ApiError ? e.message : '경로를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
@@ -93,9 +123,9 @@ export default function App() {
   const weather = result ? weatherLine(result.weather) : null
 
   return (
-    <div className="app">
+    <div className={`app app--${view}${result && !sheetOpen ? ' app--sheet-closed' : ''}`}>
       <main className="map">
-        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} onSelect={setSelectedId} />
+        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} inset={inset} onSelect={setSelectedId} />
         {result && (
           <div className="map__tools" role="radiogroup" aria-label="지도 표시">
             {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘']] as [MapOverlay, string][]).map(([k, label]) => (
@@ -105,13 +135,12 @@ export default function App() {
         )}
       </main>
 
-      <aside className={`panel panel--${view}`} aria-label="길찾기">
-        <div className="panel__scroll">
+      <div ref={dockRef} className={`dock dock--${view}`}>
+        <aside ref={panelRef} className="panel" aria-label="길찾기">
           <div className="topbar">
             <span className="brand">Pathfinder</span>
             <AuthMenu user={auth.user} providers={auth.providers} onLogin={auth.login} onDevLogin={auth.loginDev} onLogout={auth.logout} />
           </div>
-
           {view !== 'detail' && (
             <header className="head">
               <div className="inputs">
@@ -131,31 +160,39 @@ export default function App() {
               {error && <p className="error" role="alert">{error}</p>}
             </header>
           )}
+        </aside>
 
-          {result && view === 'list' && (
-            <section className="results" aria-label="추천 경로">
-              <div className="results__head">
-                <h2 className="results__title">추천 경로{result.personalized && <span className="results__tag">내 취향 반영</span>}</h2>
-                {weather && <span className="results__weather">{weather}</span>}
-              </div>
-              <div className="rows" role="listbox" aria-label="경로 목록">
-                {result.routes.map((r) => (
-                  <RouteRow key={r.id} route={r} selected={selected?.id === r.id}
-                    onSelect={() => { setSelectedId(r.id); if (selected?.id === r.id) setView('detail') }} />
-                ))}
-              </div>
-              {selected && (
-                <button type="button" className="cta cta--ghost" onClick={() => setView('detail')}>경로 자세히 보기</button>
+        {result && (
+          <section ref={sheetRef} className={`sheet${sheetOpen ? ' is-open' : ''}`} aria-label="추천 경로">
+            <button type="button" className="sheet__handle" onClick={() => setSheetOpen((v) => !v)} aria-label={sheetOpen ? '경로 목록 접기' : '경로 목록 펼치기'} aria-expanded={sheetOpen}>
+              <span />
+            </button>
+            <div className="sheet__scroll">
+              {view === 'list' && (
+                <>
+                  <div className="results__head">
+                    <h2 className="results__title">추천 경로{result.personalized && <span className="results__tag">내 취향 반영</span>}</h2>
+                    {weather && <span className="results__weather">{weather}</span>}
+                  </div>
+                  <div className="rows" role="listbox" aria-label="경로 목록">
+                    {result.routes.map((r) => (
+                      <RouteRow key={r.id} route={r} selected={selected?.id === r.id}
+                        onSelect={() => { setSelectedId(r.id); setSheetOpen(true); if (selected?.id === r.id) setView('detail') }} />
+                    ))}
+                  </div>
+                  {selected && (
+                    <button type="button" className="cta cta--ghost" onClick={() => setView('detail')}>경로 자세히 보기</button>
+                  )}
+                </>
               )}
-            </section>
-          )}
-
-          {result && selected && view === 'detail' && (
-            <RouteDetail route={selected} originName={origin?.name ?? ''} destinationName={destination?.name ?? ''} onBack={() => setView('list')}
-              onChoose={choose} choosing={choosing} chosen={chosenId === selected.id} />
-          )}
-        </div>
-      </aside>
+              {selected && view === 'detail' && (
+                <RouteDetail route={selected} originName={origin?.name ?? ''} destinationName={destination?.name ?? ''} onBack={() => setView('list')}
+                  onChoose={choose} choosing={choosing} chosen={chosenId === selected.id} />
+              )}
+            </div>
+          </section>
+        )}
+      </div>
 
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>

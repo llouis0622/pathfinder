@@ -157,4 +157,7 @@ export type AuthProviders = { providers: ('kakao' | 'naver')[]; dev_login: boole
 export type ChooseResponse = { recorded: boolean; learned: boolean; updates: number; summary: string[] }
 export type Preferences = { updates: number; weights: Record<string, number>; summary: string[] }
 
+/** 지도 위를 덮는 UI(검색 패널·바텀시트) 두께. 경로를 맞출 때 이만큼 비워 둔다. */
+export type MapInset = { top: number; right: number; bottom: number; left: number }
+
 export type MapOverlay = 'mode' | 'grade' | 'shade'

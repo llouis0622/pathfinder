@@ -33,18 +33,23 @@ button:disabled { cursor: not-allowed; }
 h1, h2, h3, p { margin: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 
-/* ---------- 레이아웃: 지도 전면, 길찾기 패널은 지도 위 상단 (카카오맵·네이버지도) ---------- */
+/* ---------- 레이아웃: 지도 전면, 길찾기 패널은 지도 위 (카카오맵·네이버지도) ---------- */
 .app { position: relative; height: 100dvh; background: var(--g100); overflow: hidden; }
 .map { position: absolute; inset: 0; background: var(--g100); }
 .map-canvas { position: absolute; inset: 0; }
 .schematic { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.schematic__svg { width: 100%; height: 100%; display: block; }
 .schematic--empty { display: flex; align-items: center; justify-content: center; }
-.panel {
+/* 데스크톱: 검색 패널과 결과 시트를 한 카드에 세로로 */
+.dock {
   position: absolute; top: 16px; left: 16px; width: var(--panel-w); max-height: calc(100dvh - 32px);
   background: var(--white); border-radius: 22px; box-shadow: 0 6px 28px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.04);
   display: flex; flex-direction: column; z-index: 5; overflow: hidden;
 }
-.panel__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.panel { flex: none; padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+.sheet { flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--g100); }
+.sheet__handle { display: none; }
+.sheet__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 20px; display: flex; flex-direction: column; gap: 12px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .brand { font-weight: 800; font-size: 15px; letter-spacing: -0.02em; color: var(--g900); }
 .map__tools { position: absolute; right: 16px; top: 16px; display: flex; background: var(--white); border-radius: 999px; padding: 4px; box-shadow: var(--shadow); z-index: 4; }
@@ -176,12 +181,30 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .tl--ride .tl__line { bottom: 14px; }
 .is-warn { color: var(--warn); font-weight: 700; }
 
-/* ---------- 모바일: 상단 고정 길찾기 패널, 아래로 결과 ---------- */
+/* ---------- 모바일: 위에는 길찾기만, 아래에는 경로 바텀시트, 지도는 맨 뒤 ---------- */
 @media (max-width: 860px) {
-  .panel { top: 0; left: 0; right: 0; width: auto; max-height: 100dvh; border-radius: 0 0 22px 22px; box-shadow: 0 8px 28px rgba(0,0,0,.14); }
-  .panel--search { max-height: none; }
-  .panel--list, .panel--detail { max-height: 78dvh; }
-  .panel__scroll { padding: 12px 14px 18px; }
-  .map__tools { top: auto; bottom: 16px; right: 12px; }
-  .toast { bottom: 76px; }
+  .dock { position: static; width: auto; max-height: none; background: transparent; box-shadow: none; border-radius: 0; overflow: visible; display: contents; }
+  .panel {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 6; background: var(--white);
+    border-radius: 0 0 22px 22px; box-shadow: 0 8px 28px rgba(0,0,0,.14); padding: 10px 14px 14px; gap: 10px;
+  }
+  .dock--detail .panel { display: none; }
+  .chips { flex-direction: row; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips__row { flex-wrap: nowrap; flex: none; }
+  .chips .chip { flex: none; }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--white); border-top: 0;
+    border-radius: 22px 22px 0 0; box-shadow: 0 -8px 28px rgba(0,0,0,.14); max-height: 50dvh; transition: max-height .2s ease;
+  }
+  .sheet:not(.is-open) { max-height: 112px; }
+  .sheet:not(.is-open) .sheet__scroll { overflow: hidden; }
+  .dock--detail .sheet { max-height: 88dvh; }
+  .sheet__handle { display: block; border: 0; background: transparent; padding: 10px 0 4px; width: 100%; }
+  .sheet__handle span { display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--g300); margin: 0 auto; }
+  .sheet__scroll { padding: 4px 14px 22px; }
+  .map__tools { top: auto; bottom: calc(50dvh + 12px); right: 12px; }
+  .app--sheet-closed .map__tools { bottom: 124px; }
+  .app--detail .map__tools { display: none; }
+  .toast { bottom: calc(50dvh + 12px); }
 }
