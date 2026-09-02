@@ -1,7 +1,15 @@
 import { formatDistance, formatMinutes, legColor, legTitle } from '../lib/format'
 import type { Leg, Route } from '../types'
 
-type Props = { route: Route; originName: string; destinationName: string; onBack: () => void }
+type Props = {
+  route: Route
+  originName: string
+  destinationName: string
+  onBack: () => void
+  onChoose: () => void
+  choosing?: boolean
+  chosen?: boolean
+}
 
 function walkMeta(leg: Leg): string {
   const parts = [formatDistance(leg.distance_m)]
@@ -12,7 +20,7 @@ function walkMeta(leg: Leg): string {
 }
 
 /** 네이버 길찾기식 세로 타임라인 */
-export default function RouteDetail({ route, originName, destinationName, onBack }: Props) {
+export default function RouteDetail({ route, originName, destinationName, onBack, onChoose, choosing, chosen }: Props) {
   return (
     <section className="detail" aria-label="경로 상세">
       <button type="button" className="detail__back" onClick={onBack} aria-label="경로 목록으로">
@@ -51,7 +59,7 @@ export default function RouteDetail({ route, originName, destinationName, onBack
             )
           }
           return (
-            <li key={i} className="tl tl--ride" style={{ ['--line' as string]: color }}>
+            <li key={i} className="tl tl--ride">
               <span className="tl__dot" style={{ background: color }} />
               <span className="tl__line tl__line--solid" style={{ background: color }} />
               <div className="tl__body">
@@ -73,6 +81,9 @@ export default function RouteDetail({ route, originName, destinationName, onBack
           <div className="tl__body"><strong>{destinationName || '도착'}</strong></div>
         </li>
       </ol>
+      <button type="button" className={`cta${chosen ? ' cta--done' : ''}`} onClick={onChoose} disabled={choosing || chosen}>
+        {chosen ? '이 경로로 안내 중' : choosing ? '기록 중…' : '이 경로로 가기'}
+      </button>
     </section>
   )
 }

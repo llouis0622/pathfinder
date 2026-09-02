@@ -89,6 +89,8 @@ export type Badge =
 export type Route = {
   id: string
   rank: number
+  engine_rank?: number
+  personal_score?: number
   summary: string
   badges: Badge[]
   cautions: string[]
@@ -147,6 +149,12 @@ export type RouteSearchResponse = {
   weather: Weather
   routes: Route[]
   metadata: SearchMetadata
+  personalized: boolean
 }
+
+export type User = { id: string; provider: string; nickname: string; avatar_url: string }
+export type AuthProviders = { providers: ('kakao' | 'naver')[]; dev_login: boolean }
+export type ChooseResponse = { recorded: boolean; learned: boolean; updates: number; summary: string[] }
+export type Preferences = { updates: number; weights: Record<string, number>; summary: string[] }
 
 export type MapOverlay = 'mode' | 'grade' | 'shade'

@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ApiError, fetchProfiles, searchRoutes } from './api'
+import { ApiError, chooseRoute, fetchProfiles, searchRoutes } from './api'
+import AuthMenu from './components/AuthMenu'
 import MapView from './components/MapView'
 import ProfileChips from './components/ProfileChips'
 import RouteDetail from './components/RouteDetail'
 import RouteRow from './components/RouteRow'
 import SearchBar from './components/SearchBar'
+import { useAuth } from './hooks/useAuth'
 import { PROFILE_FALLBACK, weatherLine } from './lib/format'
 import type { MapOverlay, Place, Profile, ProfileId, RouteSearchResponse } from './types'
 
 type View = 'search' | 'list' | 'detail'
 
 export default function App() {
+  const auth = useAuth()
   const [profiles, setProfiles] = useState<Profile[]>(PROFILE_FALLBACK)
   const [profile, setProfile] = useState<ProfileId>('wheelchair')
   const [preferShade, setPreferShade] = useState(false)
@@ -22,10 +25,19 @@ export default function App() {
   const [overlay, setOverlay] = useState<MapOverlay>('mode')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [choosing, setChoosing] = useState(false)
+  const [chosenId, setChosenId] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProfiles().then((list) => list.length && setProfiles(list)).catch(() => undefined)
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = window.setTimeout(() => setToast(null), 2600)
+    return () => window.clearTimeout(t)
+  }, [toast])
 
   const selected = useMemo(() => result?.routes.find((r) => r.id === selectedId) ?? result?.routes[0] ?? null, [result, selectedId])
   const canSearch = !!origin && !!destination && !loading
@@ -43,6 +55,7 @@ export default function App() {
       })
       setResult(res)
       setSelectedId(res.routes[0]?.id ?? null)
+      setChosenId(null)
       setView('list')
     } catch (e) {
       setResult(null)
@@ -52,9 +65,24 @@ export default function App() {
     }
   }
 
+  async function choose() {
+    if (!result || !selected) return
+    setChoosing(true)
+    try {
+      const res = await chooseRoute(result.request_id, selected.id)
+      setChosenId(selected.id)
+      if (res.learned) setToast(res.summary[0] ? `취향에 반영했어요 · ${res.summary[0]}` : '취향에 반영했어요')
+      else if (!auth.user) setToast('로그인하면 다음부터 이 취향을 기억해요')
+    } catch {
+      setToast('기록하지 못했어요')
+    } finally {
+      setChoosing(false)
+    }
+  }
+
   useEffect(() => {
-    // 조건이 바뀌면 결과를 접고 다시 검색하도록 유도
     setResult(null)
+    setChosenId(null)
     setView('search')
   }, [origin, destination, profile, preferShade])
 
@@ -66,11 +94,26 @@ export default function App() {
 
   return (
     <div className="app">
+      <main className="map">
+        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} onSelect={setSelectedId} />
+        {result && (
+          <div className="map__tools" role="radiogroup" aria-label="지도 표시">
+            {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘']] as [MapOverlay, string][]).map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={overlay === k} className={`map__tool${overlay === k ? ' is-on' : ''}`} onClick={() => setOverlay(k)}>{label}</button>
+            ))}
+          </div>
+        )}
+      </main>
+
       <aside className={`panel panel--${view}`} aria-label="길찾기">
         <div className="panel__scroll">
+          <div className="topbar">
+            <span className="brand">Pathfinder</span>
+            <AuthMenu user={auth.user} providers={auth.providers} onLogin={auth.login} onDevLogin={auth.loginDev} onLogout={auth.logout} />
+          </div>
+
           {view !== 'detail' && (
             <header className="head">
-              <h1 className="head__title">어디로 갈까요?</h1>
               <div className="inputs">
                 <SearchBar kind="origin" placeholder="출발지" value={origin} onSelect={setOrigin} allowCurrentLocation />
                 <div className="inputs__divider" />
@@ -92,7 +135,7 @@ export default function App() {
           {result && view === 'list' && (
             <section className="results" aria-label="추천 경로">
               <div className="results__head">
-                <h2 className="results__title">추천 경로</h2>
+                <h2 className="results__title">추천 경로{result.personalized && <span className="results__tag">내 취향 반영</span>}</h2>
                 {weather && <span className="results__weather">{weather}</span>}
               </div>
               <div className="rows" role="listbox" aria-label="경로 목록">
@@ -108,21 +151,13 @@ export default function App() {
           )}
 
           {result && selected && view === 'detail' && (
-            <RouteDetail route={selected} originName={origin?.name ?? ''} destinationName={destination?.name ?? ''} onBack={() => setView('list')} />
+            <RouteDetail route={selected} originName={origin?.name ?? ''} destinationName={destination?.name ?? ''} onBack={() => setView('list')}
+              onChoose={choose} choosing={choosing} chosen={chosenId === selected.id} />
           )}
         </div>
       </aside>
 
-      <main className="map">
-        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} onSelect={setSelectedId} />
-        {result && (
-          <div className="map__tools" role="radiogroup" aria-label="지도 표시">
-            {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘']] as [MapOverlay, string][]).map(([k, label]) => (
-              <button key={k} type="button" role="radio" aria-checked={overlay === k} className={`map__tool${overlay === k ? ' is-on' : ''}`} onClick={() => setOverlay(k)}>{label}</button>
-            ))}
-          </div>
-        )}
-      </main>
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   )
 }

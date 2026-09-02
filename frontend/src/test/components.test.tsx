@@ -34,7 +34,10 @@ describe('RouteRow', () => {
 describe('RouteDetail', () => {
   it('renders a timeline with stations, walks and elevator warnings', () => {
     const onBack = vi.fn()
-    render(<RouteDetail route={walkRoute} originName="집" destinationName="회사" onBack={onBack} />)
+    const onChoose = vi.fn()
+    render(<RouteDetail route={walkRoute} originName="집" destinationName="회사" onBack={onBack} onChoose={onChoose} />)
+    fireEvent.click(screen.getByRole('button', { name: '이 경로로 가기' }))
+    expect(onChoose).toHaveBeenCalled()
     expect(screen.getByText('집')).toBeInTheDocument()
     expect(screen.getByText('회사')).toBeInTheDocument()
     expect(screen.getAllByText('A역').length).toBeGreaterThan(0)

@@ -18,6 +18,7 @@
                                   │  graph_nodes / graph_edges / buildings   │
                                   │  transit_routes / transit_stops          │
                                   │  route_requests / route_results (로그)     │
+                                  │  users / user_policies / route_choices    │
                                   └──────────────────────────────────────────┘
                                                       ▲
                                                       │ 오프라인 빌드 (사용자 PC)
@@ -54,7 +55,8 @@
    6. ACO가 경로 아카이브를 만들고, GA가 아카이브를 교차·변이로 다듬는다.
    7. 아카이브에서 엣지 중복률이 낮은 상위 3개를 고른다.
    8. 각 경로의 구간(leg)·특성(경사·그늘·계단·엘리베이터·환승)·배지·주의사항을 만든다.
-5. 백엔드가 요청과 결과를 로그 테이블에 남기고 프론트에 돌려준다.
+5. 로그인 사용자면 학습된 취향 정책으로 순위를 다시 매긴다 (`personalized: true`).
+6. 백엔드가 요청과 결과를 로그 테이블에 남기고 프론트에 돌려준다. 사용자가 "이 경로로 가기"를 누르면 선택이 기록되고 정책이 갱신된다.
 
 ## API
 
@@ -68,6 +70,8 @@
 | GET | `/api/weather?lat&lng&at` | 날씨 컨텍스트. `at`이 30분 이상 미래면 시간별 예보 |
 | POST | `/api/route` | 경로 Top K. 본문: `origin, destination, profile, prefer_shade, departure_at(생략 시 지금), options{k, time_budget_s, seed}`. 날씨는 항상 실시간(또는 출발 시각 예보) 반영, 경사 회피는 항상 켬 |
 | GET | `/api/route/{request_id}` | 저장된 요청·결과 조회 |
+| POST | `/api/route/{request_id}/choose` | 사용자가 고른 경로 기록. 로그인 사용자는 취향 학습 ([docs/PERSONALIZATION.md](PERSONALIZATION.md)) |
+| GET/POST | `/api/auth/*`, `/api/me/preferences` | 카카오·네이버 로그인, 세션, 학습된 취향 |
 
 `POST /api/route` 응답: `request_id, profile, departure_at, prefer_shade, weather{source, flags[], …}, routes[](엔진 RouteOut 그대로), metadata`.
 엔진이 422(경로 없음)를 주면 백엔드도 422로 전달하고 요청은 `status=no_route`로 남긴다.

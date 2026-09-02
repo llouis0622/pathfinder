@@ -33,5 +33,6 @@ export const response: RouteSearchResponse = {
   prefer_shade: false,
   weather: { source: 'open_meteo', observed_at: null, forecast_for: '2026-08-03T13:00:00+09:00', temp_c: 31, feels_like_c: 34.2, precipitation_mm: 0, wind_ms: 3, pm10: 40, sky: 'clear', flags: ['heatwave', 'heat'], note: '' },
   routes: [walkRoute, { ...walkRoute, id: 'route_2', rank: 2, badges: ['shortest_walk'], cautions: [], transfers: 1 }],
+  personalized: false,
   metadata: { profile: 'wheelchair', profile_label: '휠체어 이용자', weather_flags: ['heatwave', 'heat'], departure_at: null, preferences: { avoid_slope: true, prefer_shade: false }, shade_status: 'computed', shade_note: '', building_height_coverage: 0.97, elevation_resolution_m: 90, elapsed_ms: 130 },
 }

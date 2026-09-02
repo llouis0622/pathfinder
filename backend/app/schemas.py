@@ -61,6 +61,31 @@ class RouteSearchResponse(BaseModel):
     weather: WeatherOut
     routes: list[dict[str, Any]]
     metadata: dict[str, Any]
+    personalized: bool = False
+
+
+class ChooseRequest(BaseModel):
+    route_id: str = Field(min_length=1, max_length=32)
+
+
+class ChooseResponse(BaseModel):
+    recorded: bool
+    learned: bool
+    updates: int
+    summary: list[str] = Field(default_factory=list)
+
+
+class UserOut(BaseModel):
+    id: str
+    provider: str
+    nickname: str
+    avatar_url: str = ""
+
+
+class PreferencesOut(BaseModel):
+    updates: int
+    weights: dict[str, float]
+    summary: list[str]
 
 
 class StoredRouteResponse(BaseModel):
