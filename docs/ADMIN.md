@@ -17,6 +17,7 @@
 | `ADMIN_LOGIN_MAX_FAILURES` | 5 | 같은 IP 에서 이 횟수만큼 실패하면 잠금 |
 | `ADMIN_LOGIN_LOCKOUT_S` | 300 | 잠금 시간(초) |
 | `ACCESS_LOG_ENABLED` | true | `/api` 호출을 `api_access_logs` 에 기록 |
+| `LOG_RETENTION_DAYS` | 90 | 접근 로그·장소 검색·엔진 성능 로그 보존 일수. 시작 60초 뒤와 이후 하루 한 번 자동 삭제. 0 이면 끔. `route_requests` 등 분석 원본은 지우지 않는다 |
 
 운영에서는 `JWT_SECRET` 을 32자 이상으로, `COOKIE_SECURE=true` 로 두고, 가능하면 `/admin` 과 `/api/admin` 을 사내망/VPN 으로 제한한다.
 
@@ -60,6 +61,9 @@
 | GET | `/users/{id}` | 프로필, 통계, 정책(가중치·요약), 최근 요청, 선택 이력, 정책 갱신 이력, 최근 접근 |
 | DELETE | `/users/{id}/policy` | 취향 초기화 (접근 로그에 기록) |
 | GET | `/export/{requests,choices,users,access,engine}.csv?days=` | CSV (BOM 포함, 최대 5만 행) |
+| GET | `/maintenance` | 로그 보존 일수와 접근 로그·장소 검색·엔진 성능 표의 행 수·가장 오래된 시각 |
+| POST | `/maintenance/prune` `{days?}` | 그 일수보다 오래된 위 세 표의 행 삭제 (0 = 전부, 생략 = `LOG_RETENTION_DAYS`). 접근 로그에 `prune_logs:<days>d:<n>` 로 남는다 |
+| GET | `/analytics/ips?days=` | 개인화 오프라인 평가: 로그된 propensity 로 엔진 순위·개인화 탐욕 정책의 1순위 적중률을 IPS/SNIPS 로 추정, ESS 포함 |
 
 집계는 기간 창 안의 행을 가벼운 열만 읽어 Python 에서 KST 일 단위로 묶는다(PostgreSQL/SQLite 공통).
 검색량이 커지면 `route_requests.created_at`, `api_access_logs.created_at` 인덱스가 있으므로 기간을 줄이거나 집계 테이블을 두면 된다.
@@ -93,3 +97,16 @@ npm run dev   # http://localhost:5173/admin
 ```
 
 데모 로그인으로 검색·선택을 몇 번 하면 대시보드와 취향 화면이 채워진다.
+
+## 개인화 오프라인 평가 (IPS)
+
+행동을 "1순위에 놓은 경로", 보상을 "사용자가 그 경로를 골랐는가(0/1)" 로 두고, 로깅 확률
+`p_b(a) = (1−ε)·1[a = 정책 argmax] + ε·π(a)` (ε-greedy 혼합, π 는 저장된 propensity)로 두 결정적 정책을 역확률 가중한다.
+
+```
+w   = 1[a_target = a_shown] / p_b(a_shown)
+IPS = 평균(r·w),   SNIPS = Σ(r·w) / Σw,   ESS = (Σw)² / Σw²
+```
+
+탐험(ε) 표본이 없으면 엔진 정책의 추정은 개인화 1순위가 엔진 1순위와 같은 검색에만 기대므로 ESS 가 작다.
+ESS 가 표본 수에 가까울수록 믿을 만하다. 화면: `/admin/analytics/quality` 의 "오프라인 평가" 카드.

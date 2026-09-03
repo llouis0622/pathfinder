@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     admin_login_max_failures: int = 5                     # 이 횟수 실패하면 잠금
     admin_login_lockout_s: int = 300
     access_log_enabled: bool = True                       # 모든 /api 호출을 api_access_logs 에 기록
+    log_retention_days: int = 90                          # 접근·장소검색·엔진 로그 보존 일수 (0 = 지우지 않음)
 
     @property
     def cors_origin_list(self) -> list[str]:

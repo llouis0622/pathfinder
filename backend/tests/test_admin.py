@@ -174,3 +174,53 @@ def test_overview_analytics_preferences_and_export(admin_client):
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
         assert len(r.text.splitlines()) >= 2, kind
     assert c.get("/api/admin/export/nope.csv").status_code == 404
+
+
+def test_maintenance_prune_and_info(admin_client):
+    c = admin_client
+    seed(c)
+    login_admin(c)
+    info = c.get("/api/admin/maintenance").json()
+    assert info["retention_days"] == 90 and info["tables"]["api_access_logs"]["rows"] >= 3 and info["tables"]["engine_runs"]["rows"] == 2
+    assert c.post("/api/admin/maintenance/prune", json={"days": 30}).json()["deleted"] == {"api_access_logs": 0, "place_searches": 0, "engine_runs": 0}
+    wiped = c.post("/api/admin/maintenance/prune", json={"days": 0}).json()
+    assert wiped["days"] == 0 and wiped["deleted"]["engine_runs"] == 2 and wiped["deleted"]["api_access_logs"] >= 3
+    after = c.get("/api/admin/maintenance").json()["tables"]
+    assert after["engine_runs"]["rows"] == 0
+    assert c.get("/api/admin/logs/engine").json()["total"] == 0
+    # 정리 이벤트 자체는 접근 로그에 남는다
+    assert any((i["detail"] or "").startswith("prune_logs:0d:") for i in c.get("/api/admin/logs/access", params={"kind": "admin"}).json()["items"])
+    assert c.post("/api/admin/maintenance/prune", json={"days": -1}).status_code == 422
+
+
+def test_ips_offline_evaluation(admin_client):
+    from app.services.admin_stats import ips_from_samples
+
+    assert ips_from_samples([], 0.1) == {"samples": 0, "epsilon": 0.1, "policies": {}}
+    # 개인화 탐욕이 엔진과 다른 경로를 1순위에 두고 사용자가 그걸 고른 경우 + 탐험으로 엔진 1순위가 보인 경우
+    samples = [
+        {"shown": "b", "chosen": "b", "engine": "a", "greedy": "b", "propensities": {"a": 0.3, "b": 0.6, "c": 0.1}, "explored": False},
+        {"shown": "b", "chosen": "c", "engine": "a", "greedy": "b", "propensities": {"a": 0.3, "b": 0.6, "c": 0.1}, "explored": False},
+        {"shown": "a", "chosen": "a", "engine": "a", "greedy": "b", "propensities": {"a": 0.3, "b": 0.6, "c": 0.1}, "explored": True},
+    ]
+    res = ips_from_samples(samples, 0.1)
+    assert res["samples"] == 3 and res["logged_hit_rate"] == round(2 / 3, 4)
+    pers, eng = res["policies"]["personalized"], res["policies"]["engine"]
+    assert pers["matched"] == 2 and eng["matched"] == 1
+    # 개인화: 표본 1,2 가 일치, p_b = 0.9 + 0.1*0.6 = 0.96 → IPS = (1/0.96)/3 ; 엔진: 표본 3 만 일치, p_b = 0.1*0.3 = 0.03 → 33.3/3
+    assert pers["ips"] == round((1 / 0.96) / 3, 4) and pers["snips"] == 0.5
+    assert eng["ips"] == round((1 / 0.03) / 3, 4) and eng["snips"] == 1.0 and eng["ess"] == 1.0
+
+    c = admin_client
+    _, user_id = seed(c)
+    login_admin(c)
+    r = c.get("/api/admin/analytics/ips", params={"days": 7}).json()
+    # seed 는 개인화 검색 1건(선택 없음) → 표본 0
+    assert r["samples"] == 0 and r["days"] == 7 and r["epsilon"] == 0.0
+    c.cookies.set("pf_session", c.post("/api/auth/dev/login", params={"nickname": "관리테스트"}).cookies["pf_session"])
+    res = c.post("/api/route", json=ROUTE_BODY).json()
+    assert res["personalized"] is True
+    c.post(f"/api/route/{res['request_id']}/choose", json={"route_id": res["routes"][0]["id"]})
+    c.cookies.delete("pf_session")
+    r = c.get("/api/admin/analytics/ips").json()
+    assert r["samples"] == 1 and r["policies"]["personalized"]["matched"] == 1 and r["policies"]["personalized"]["ips"] == 1.0

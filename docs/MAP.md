@@ -48,6 +48,7 @@ WebGL 이 없는 환경에서는 SVG 약식 지도(`SchematicMap`)로 대체한�
 화면 범위와 출발 시각(검색 결과의 `departure_at`, 없으면 지금)으로 `GET /api/shade?min_lat&min_lng&max_lat&max_lng&at` 를 호출한다.
 엔진은 범위 안의 보행 엣지와 주변 300m 건물로 `edge_shade_ratios` 를 계산해 `{edge_id: 0~1}` 을 돌려주고,
 프론트는 `setFeatureState` 로 엣지 색을 바꾼다. 한 변 3.5km 를 넘는 범위는 422 로 거부한다.
+그늘 오버레이에는 시각 슬라이더(06:00~20:00, 30분 단위)가 있어 "오후 3시엔 어디가 그늘인지" 미리 볼 수 있다. 기본은 출발 시각(검색 전에는 지금)이다.
 
 ## 현재 위치(GPS)
 

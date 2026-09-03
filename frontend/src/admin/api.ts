@@ -112,6 +112,11 @@ export type EngineStats = {
   days: number; summary: EngineBlock; per_profile: (EngineBlock & { profile: string; label: string })[]
   daily: { date: string; runs: number; p50_ms: number | null; p95_ms: number | null }[]; shade_status: { status: string; count: number }[]
 }
+export type Maintenance = { retention_days: number; tables: Record<string, { rows: number; oldest: string | null }> }
+export type PruneResult = { days: number; deleted: Record<string, number> }
+export type IpsPolicy = { matched: number; ips: number; snips: number | null; ess: number }
+export type Ips = { samples: number; epsilon: number; logged_hit_rate?: number; explored?: number; days?: number; note?: string
+  policies: Partial<Record<'engine' | 'personalized', IpsPolicy>> }
 export type Preferences = {
   learned_users: number; total_policies: number
   per_feature: { feature: string; positive_label: string; negative_label: string; mean: number; positive_users: number; negative_users: number }[]
@@ -129,6 +134,9 @@ export const fetchQuality = (days: number) => call<Quality>(`/api/admin/analytic
 export const fetchSpatial = (days: number) => call<Spatial>(`/api/admin/analytics/spatial${qs({ days })}`)
 export const fetchEngineStats = (days: number) => call<EngineStats>(`/api/admin/analytics/engine${qs({ days })}`)
 export const fetchPreferencesAll = () => call<Preferences>('/api/admin/preferences')
+export const fetchMaintenance = () => call<Maintenance>('/api/admin/maintenance')
+export const pruneLogs = (days?: number) => call<PruneResult>('/api/admin/maintenance/prune', { method: 'POST', body: JSON.stringify(days === undefined ? {} : { days }) })
+export const fetchIps = (days: number) => call<Ips>(`/api/admin/analytics/ips${qs({ days })}`)
 export const fetchRequests = (params: Record<string, string | number | boolean | undefined>) => call<Paged<RequestRow>>(`/api/admin/logs/requests${qs(params)}`)
 export const fetchRequestDetail = (id: string) => call<RequestDetail>(`/api/admin/logs/requests/${id}`)
 export const fetchAccess = (params: Record<string, string | number | undefined>) => call<Paged<AccessRow>>(`/api/admin/logs/access${qs(params)}`)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { fetchEngineStats, fetchQuality, fetchSpatial, fetchUsage } from '../api'
+import { fetchEngineStats, fetchIps, fetchQuality, fetchSpatial, fetchUsage } from '../api'
 import { BarChart, LineChart, RankBars, SERIES, ShareBar, StatTile, fmtMs, fmtNum, fmtPct, shortDates } from '../charts'
 import { Card, DaysPicker, Loading, STATUS_LABEL, Table, badgeLabel, flagLabel, useFetch } from '../ui'
 
@@ -78,6 +78,33 @@ function Usage({ days }: { days: number }) {
   )
 }
 
+function IpsCard({ days }: { days: number }) {
+  const { data, loading, error } = useFetch(() => fetchIps(days), [days])
+  return (
+    <Card title="오프라인 평가 (IPS · 역확률 가중)">
+      <Loading loading={loading} error={error}>
+        {data && (
+          <>
+            <div className="adm-kv" style={{ marginBottom: 12 }}>
+              <div>표본 (개인화 검색 중 선택)<b>{fmtNum(data.samples)}</b></div>
+              <div>탐험 표본<b>{fmtNum(data.explored ?? 0)}</b></div>
+              <div>로깅 1순위 적중률<b>{fmtPct(data.logged_hit_rate ?? null)}</b></div>
+              <div>ε<b>{data.epsilon}</b></div>
+            </div>
+            <Table head={['정책', '일치 표본', 'IPS', 'SNIPS', '유효 표본 수']}>
+              {(['personalized', 'engine'] as const).map((k) => data.policies[k] && (
+                <tr key={k}><td>{k === 'engine' ? '엔진 순위' : '개인화 (탐욕)'}</td><td>{fmtNum(data.policies[k]!.matched)}</td><td>{fmtPct(data.policies[k]!.ips)}</td><td>{fmtPct(data.policies[k]!.snips)}</td><td>{fmtNum(data.policies[k]!.ess, 1)}</td></tr>
+              ))}
+              {data.samples === 0 && <tr><td colSpan={5} className="adm-muted">아직 표본이 없어요</td></tr>}
+            </Table>
+            {data.note && <p className="adm-muted" style={{ marginTop: 10, fontSize: 13 }}>{data.note}</p>}
+          </>
+        )}
+      </Loading>
+    </Card>
+  )
+}
+
 function Quality({ days }: { days: number }) {
   const { data, loading, error } = useFetch(() => fetchQuality(days), [days])
   return (
@@ -107,6 +134,7 @@ function Quality({ days }: { days: number }) {
               {data.per_profile.length === 0 && <tr><td colSpan={7} className="adm-muted">데이터 없음</td></tr>}
             </Table>
           </Card>
+          <IpsCard days={days} />
           <div className="adm-grid adm-grid--2">
             <Card title="자주 붙은 배지"><RankBars items={data.badges.map((b) => ({ label: badgeLabel(b.key), value: b.count }))} color={SERIES[2]} /></Card>
             <Card title="자주 나온 주의 사항"><RankBars items={data.cautions.map((c) => ({ label: c.key, value: c.count }))} color={SERIES[3]} empty="주의 사항 없음" /></Card>

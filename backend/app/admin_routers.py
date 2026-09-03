@@ -19,6 +19,7 @@ from . import admin, audit
 from .config import Settings
 from .models import ApiAccessLog, EngineRun, PlaceSearch, PolicyUpdate, RouteChoice, RouteRequest, RouteResult, User, UserPolicy
 from .services import admin_stats as stats
+from .services.maintenance import log_counts, prune_logs
 from .services.personalization import Policy
 
 KST = ZoneInfo("Asia/Seoul")
@@ -339,6 +340,29 @@ async def user_reset_policy(user_id: str, request: Request, db: AsyncSession = D
         await db.commit()
     audit.mark(request, "admin", f"reset_policy:{uid}")
     return {"ok": True, "reset": row is not None}
+
+
+# ---------------------------------------------------------------- 로그 정리
+class PruneBody(BaseModel):
+    days: int | None = Field(default=None, ge=0, le=3650, description="이 일수보다 오래된 로그 삭제. 0 이면 전부. 생략 시 LOG_RETENTION_DAYS")
+
+
+@guarded.get("/maintenance", summary="로그 보존 설정과 표별 행 수")
+async def maintenance_info(cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    return {"retention_days": cfg.log_retention_days, "tables": await log_counts(db)}
+
+
+@guarded.post("/maintenance/prune", summary="오래된 접근·장소검색·엔진 로그 즉시 정리")
+async def maintenance_prune(body: PruneBody, request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    days = cfg.log_retention_days if body.days is None else body.days
+    deleted = await prune_logs(db, days)
+    audit.mark(request, "admin", f"prune_logs:{days}d:{sum(deleted.values())}")
+    return {"days": days, "deleted": deleted}
+
+
+@guarded.get("/analytics/ips", summary="개인화 오프라인 평가 (IPS / SNIPS)")
+async def analytics_ips(days: int = Query(30, ge=1, le=365), cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.ips(db, days, cfg.personalization_epsilon)
 
 
 # ---------------------------------------------------------------- CSV 내보내기

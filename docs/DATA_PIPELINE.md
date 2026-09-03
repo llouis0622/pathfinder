@@ -96,7 +96,7 @@ tactile_paving, kerb, crossing, lit, wheelchair, sidewalk, tunnel, bridge, level
 ## 5. 건물
 
 OSM `building=*` 폴리곤. 높이: `height`(m) → `building:levels × 3.3` → 없으면 `None`(그림자 계산 제외).
-VWorld `LT_C_BLDGINFO` WFS(`VWORLD_API_KEY`)를 쓰면 실측 높이로 대체한다.
+`--vworld-key`(또는 `VWORLD_API_KEY`)를 주면 보행망 bbox 를 0.05° 셀로 나눠 VWorld `LT_C_BLDGINFO` WFS 를 받아, 높이를 모르는 OSM 건물에 가장 가까운(중심점 15 m 이내) 실측 높이를 채우고 OSM 과 겹치지 않는 건물은 추가한다. `report.json` 의 `buildings.vworld` 에 filled/added 가 남는다.
 
 ## 6. PostGIS 스키마
 

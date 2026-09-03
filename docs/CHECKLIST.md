@@ -29,7 +29,7 @@
 
 | # | 항목 | 어디서 | 넣는 곳 | 없으면 |
 |---|---|---|---|---|
-| C1 | **VWorld 오픈API 키** (건물 실측 높이 WFS `LT_C_BLDGINFO`) — B1 과 같은 키로 가능 | vworld.kr | `VWORLD_API_KEY` | OSM `height`/`building:levels` 기반 높이만 사용 → 그늘 정확도 하락 |
+| C1 | **VWorld 오픈API 키** (건물 실측 높이 WFS `LT_C_BLDGINFO`) — B1 과 같은 키로 가능 | vworld.kr | `VWORLD_API_KEY` 또는 `run_all --vworld-key` | OSM `height`/`building:levels` 기반 높이만 사용 → 그늘 정확도 하락 |
 | C2 | **OpenWeather API 키** | https://openweathermap.org/api | `WEATHER_PROVIDER=openweather`, `OPENWEATHER_API_KEY` | 기본 Open-Meteo(키 불필요)로 충분 |
 | C3 | **GTFS 폴더** (`routes.txt, trips.txt, stop_times.txt, stops.txt`) | 부산시/ODsay 등 GTFS 제공처 | `run_all --gtfs DIR` | BIMS(B5)로 대체 |
 | C4 | **MapLibre 스타일 URL** (자체 타일 서버) | 자체 호스팅 | `VITE_BASEMAP_STYLE_URL` | VWorld/OpenFreeMap 사용 |

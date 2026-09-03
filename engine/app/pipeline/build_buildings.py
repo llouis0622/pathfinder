@@ -120,3 +120,78 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------- VWorld 실측 높이 병합
+def bbox_cells(bbox: tuple[float, float, float, float], step_deg: float = 0.05) -> list[tuple[float, float, float, float]]:
+    """WFS 페이지 한도를 넘지 않도록 bbox 를 격자 셀로 나눈다. (min_lat, min_lng, max_lat, max_lng)"""
+    min_lat, min_lng, max_lat, max_lng = bbox
+    cells: list[tuple[float, float, float, float]] = []
+    lat = min_lat
+    while lat < max_lat:
+        lng = min_lng
+        while lng < max_lng:
+            cells.append((lat, lng, min(lat + step_deg, max_lat), min(lng + step_deg, max_lng)))
+            lng += step_deg
+        lat += step_deg
+    return cells
+
+
+def fetch_vworld_buildings(bbox: tuple[float, float, float, float], key: str, step_deg: float = 0.05,
+                           fetch=None, id_start: int = 10_000_000) -> list[Building]:
+    """bbox 를 셀로 나눠 VWorld 건물을 모두 받는다. ufid 로 중복을 제거한다. fetch 는 테스트용 주입점."""
+    fetch = fetch or fetch_vworld
+    seen: set[str] = set()
+    features: list[dict] = []
+    for cell in bbox_cells(bbox, step_deg):
+        for f in fetch(cell, key):
+            uid = str((f.get("properties") or {}).get("ufid") or "")
+            if uid and uid in seen:
+                continue
+            if uid:
+                seen.add(uid)
+            features.append(f)
+    return buildings_from_vworld_features(features, id_start=id_start)
+
+
+def merge_vworld_heights(osm: list[Building], vworld: list[Building], max_dist_m: float = 15.0) -> tuple[list[Building], dict]:
+    """OSM 건물 중 높이를 모르는 것에 가장 가까운 VWorld 건물(중심점 거리 ≤ max_dist_m) 높이를 채우고,
+    OSM 과 겹치지 않는 VWorld 건물은 그대로 추가한다."""
+    from shapely.geometry import Polygon
+    from shapely.strtree import STRtree
+
+    from ..graph.geo import haversine_m
+
+    if not vworld:
+        return list(osm), {"filled": 0, "added": 0, "vworld": 0}
+    vw_polys = [Polygon([(lng, lat) for lat, lng in b.footprint]) for b in vworld]
+    tree = STRtree(vw_polys)
+    merged: list[Building] = []
+    filled = 0
+    used: set[int] = set()
+    for b in osm:
+        poly = Polygon([(lng, lat) for lat, lng in b.footprint])
+        hits = tree.query(poly, predicate="intersects")
+        used.update(int(i) for i in hits)
+        if b.height_m is None and len(hits) > 0:
+            c = poly.centroid
+            best = None
+            for i in hits:
+                v = vworld[int(i)]
+                if v.height_m is None:
+                    continue
+                vc = vw_polys[int(i)].centroid
+                d = float(haversine_m(c.y, c.x, vc.y, vc.x))
+                if d <= max_dist_m and (best is None or d < best[0]):
+                    best = (d, v.height_m)
+            if best is not None:
+                b = Building(id=b.id, height_m=best[1], footprint=b.footprint, holes=b.holes)
+                filled += 1
+        merged.append(b)
+    added = 0
+    for i, v in enumerate(vworld):
+        if i in used:
+            continue
+        merged.append(v)
+        added += 1
+    return merged, {"filled": filled, "added": added, "vworld": len(vworld)}
