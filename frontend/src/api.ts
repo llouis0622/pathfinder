@@ -50,7 +50,8 @@ export function searchRoutes(payload: RouteSearchRequest): Promise<RouteSearchRe
   return request('/api/route', { method: 'POST', body: JSON.stringify(payload) })
 }
 
-export function fetchStoredRoute(requestId: string): Promise<{ request_id: string; routes: Route[]; status: string; profile: ProfileId; origin: { lat: number; lng: number; name: string }; destination: { lat: number; lng: number; name: string }; created_at: string }> {
+export type StoredRoute = { request_id: string; routes: Route[]; status: string; profile: ProfileId; origin: { lat: number; lng: number; name: string }; destination: { lat: number; lng: number; name: string }; created_at: string; weather: Weather | null; metadata: RouteSearchResponse['metadata'] | null }
+export function fetchStoredRoute(requestId: string): Promise<StoredRoute> {
   return request(`/api/route/${encodeURIComponent(requestId)}`)
 }
 

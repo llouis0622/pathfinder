@@ -39,7 +39,7 @@ export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined'
 }
 
-export function speak(text: string, opts: { rate?: number; interrupt?: boolean } = {}): boolean {
+export function speak(text: string, opts: { rate?: number; interrupt?: boolean; onEnd?: () => void } = {}): boolean {
   if (!speechSupported() || !text.trim()) return false
   const synth = window.speechSynthesis
   if (opts.interrupt !== false) synth.cancel()
@@ -48,6 +48,7 @@ export function speak(text: string, opts: { rate?: number; interrupt?: boolean }
   u.rate = opts.rate ?? 0.95
   const voice = synth.getVoices().find((v) => v.lang.toLowerCase().startsWith('ko'))
   if (voice) u.voice = voice
+  if (opts.onEnd) { u.onend = opts.onEnd; u.onerror = opts.onEnd }
   synth.speak(u)
   return true
 }

@@ -18,9 +18,12 @@ export default function SearchBar({ kind, placeholder, value, near, onSelect, al
   const [active, setActive] = useState(-1)
   const listId = useId()
   const timer = useRef<number | null>(null)
+  const typing = useRef(false)   // 사용자가 지우고 다시 입력하는 중이면 값 초기화가 입력을 덮지 않게
 
   useEffect(() => {
-    setQuery(value?.name ?? '')
+    if (value) setQuery(value.name)
+    else if (!typing.current) setQuery('')
+    typing.current = false
   }, [value])
 
   useEffect(() => {
@@ -73,7 +76,7 @@ export default function SearchBar({ kind, placeholder, value, near, onSelect, al
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)
-          if (value) onSelect(null)
+          if (value) { typing.current = true; onSelect(null) }
         }}
         onFocus={() => results.length > 0 && setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 150)}
