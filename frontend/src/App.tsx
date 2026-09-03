@@ -13,6 +13,23 @@ import type { MapInset, MapOverlay, Place, Profile, ProfileId, RouteSearchRespon
 type View = 'search' | 'list' | 'detail'
 
 const ZERO_INSET: MapInset = { top: 0, right: 0, bottom: 0, left: 0 }
+
+/** 오늘(KST) 의 hour(소수 허용) 시각을 ISO 문자열로. */
+function kstToday(hour: number): string {
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000)
+  const y = kst.getUTCFullYear(), m = String(kst.getUTCMonth() + 1).padStart(2, '0'), d = String(kst.getUTCDate()).padStart(2, '0')
+  const h = Math.floor(hour), mi = Math.round((hour - h) * 60)
+  return `${y}-${m}-${d}T${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}:00+09:00`
+}
+function currentHour(): number {
+  const kst = new Date(Date.now() + 9 * 3600 * 1000)
+  return Math.min(20, Math.max(6, Math.round((kst.getUTCHours() + kst.getUTCMinutes() / 60) * 2) / 2))
+}
+function formatHour(hour: number): string {
+  const h = Math.floor(hour), mi = Math.round((hour - h) * 60)
+  return `${h}:${String(mi).padStart(2, '0')}`
+}
 const MOBILE_QUERY = '(max-width: 860px)'
 
 export default function App() {
@@ -35,6 +52,7 @@ export default function App() {
   const [inset, setInset] = useState<MapInset>(ZERO_INSET)
   const [myLocation, setMyLocation] = useState<LocatedPoint | null>(null)
   const [zoom, setZoom] = useState(12)
+  const [shadeHour, setShadeHour] = useState<number | null>(null)   // null = 출발 시각(또는 지금)
   const dockRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
@@ -123,17 +141,27 @@ export default function App() {
     setDestination(origin)
   }
   const weather = result ? weatherLine(result.weather) : null
+  const shadeAt = useMemo(() => (shadeHour === null ? result?.departure_at ?? null : kstToday(shadeHour)), [shadeHour, result?.departure_at])
 
   return (
     <div className={`app app--${view}${result && !sheetOpen ? ' app--sheet-closed' : ''}`}>
       <main className="map">
         <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} inset={inset}
-          departureAt={result?.departure_at ?? null} onSelect={setSelectedId} onLocate={setMyLocation} onZoom={setZoom} />
+          departureAt={shadeAt} onSelect={setSelectedId} onLocate={setMyLocation} onZoom={setZoom} />
         <div className="map__tools" role="radiogroup" aria-label="지도 표시">
           {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘'], ['facility', '시설']] as [MapOverlay, string][]).map(([k, label]) => (
             <button key={k} type="button" role="radio" aria-checked={overlay === k} className={`map__tool${overlay === k ? ' is-on' : ''}`} onClick={() => setOverlay(k)}>{label}</button>
           ))}
         </div>
+        {overlay === 'shade' && (
+          <div className="map__shade" role="group" aria-label="그늘 시각">
+            <label>
+              <span>그늘 시각 <b>{shadeHour === null ? (result?.departure_at ? '출발 시각' : '지금') : formatHour(shadeHour)}</b></span>
+              <input type="range" min={6} max={20} step={0.5} value={shadeHour ?? currentHour()} onChange={(e) => setShadeHour(Number(e.target.value))} aria-label="그늘을 볼 시각" />
+            </label>
+            {shadeHour !== null && <button type="button" className="map__shade-reset" onClick={() => setShadeHour(null)}>지금으로</button>}
+          </div>
+        )}
         {overlay !== 'mode' && zoom < 15 && <div className="map__hint">지도를 확대하면 {overlay === 'grade' ? '경사' : overlay === 'shade' ? '그늘' : '시설'}이 표시돼요</div>}
         {myLocation && origin?.id !== 'current' && (
           <button type="button" className="map__locate" onClick={() => setOrigin({ id: 'current', name: '현재 위치', address: '', lat: myLocation.lat, lng: myLocation.lng, category: '', source: 'geolocation' })}>

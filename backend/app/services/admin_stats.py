@@ -459,3 +459,78 @@ def choice_row(c: RouteChoice, req: RouteRequest | None = None, user: User | Non
             "origin_name": (req.origin_name if req else ""), "dest_name": (req.dest_name if req else ""),
             "profile": (req.profile if req else ""), "personalized": (bool(req.personalized) if req else False),
             "explored": (bool(req.explored) if req else False)}
+
+
+# ---------------------------------------------------------------- 개인화 오프라인 평가 (IPS)
+def ips_from_samples(samples: list[dict[str, Any]], epsilon: float) -> dict[str, Any]:
+    """로그된 propensity 로 두 정책(엔진 순위, 개인화 탐욕)의 1순위 적중률을 역확률 가중으로 추정한다.
+
+    sample = {shown: 1순위로 보인 route id, chosen: 고른 route id, engine: 엔진 1순위 id, greedy: 정책 argmax id,
+              propensities: {id: π(id)}, explored: bool}
+    행동 = 1순위에 놓은 경로. 로깅 확률 p_b(a) = (1-ε)·1[a = greedy] + ε·π(a) (ε-greedy 혼합).
+    보상 r = 1[chosen == shown]. 대상 정책은 결정적이므로 π_t(a) = 1[a = a_t].
+    IPS = 평균(r·w), SNIPS = Σ(r·w)/Σw, w = 1[a_t = shown]/p_b(shown). ESS 로 신뢰도를 본다.
+    """
+    eps = max(0.0, min(1.0, float(epsilon)))
+    n = len(samples)
+    out: dict[str, Any] = {"samples": n, "epsilon": eps, "policies": {}}
+    if n == 0:
+        return out
+    naive_hits = sum(1 for s in samples if s["chosen"] == s["shown"])
+    out["logged_hit_rate"] = round(naive_hits / n, 4)
+    for name, key in (("engine", "engine"), ("personalized", "greedy")):
+        ws: list[float] = []
+        rws: list[float] = []
+        matched = 0
+        for s in samples:
+            shown = s["shown"]
+            pi = float((s.get("propensities") or {}).get(shown, 0.0))
+            p_b = (1.0 - eps) * (1.0 if shown == s["greedy"] else 0.0) + eps * pi
+            if p_b <= 0:
+                continue
+            w = (1.0 / p_b) if s[key] == shown else 0.0
+            r = 1.0 if s["chosen"] == shown else 0.0
+            ws.append(w)
+            rws.append(r * w)
+            matched += int(w > 0)
+        sw = sum(ws)
+        sw2 = sum(w * w for w in ws)
+        out["policies"][name] = {
+            "matched": matched, "ips": round(sum(rws) / n, 4), "snips": (round(sum(rws) / sw, 4) if sw > 0 else None),
+            "ess": (round(sw * sw / sw2, 1) if sw2 > 0 else 0.0),
+        }
+    return out
+
+
+async def ips(db: AsyncSession, days: int, epsilon: float) -> dict[str, Any]:
+    start, _ = window(days)
+    reqs = (await db.execute(select(RouteRequest.id, RouteRequest.propensities, RouteRequest.explored)
+                             .where(RouteRequest.created_at >= start, RouteRequest.personalized.is_(True), RouteRequest.status == "ok"))).all()
+    if not reqs:
+        return {**ips_from_samples([], epsilon), "note": "개인화가 적용된 검색이 아직 없습니다"}
+    ids = [r.id for r in reqs]
+    choices = {c.request_id: c for c in (await db.execute(select(RouteChoice).where(RouteChoice.request_id.in_(ids)))).scalars().all()}
+    results = (await db.execute(select(RouteResult.request_id, RouteResult.rank, RouteResult.engine_rank, RouteResult.payload)
+                                .where(RouteResult.request_id.in_(ids)))).all()
+    by_req: dict[uuid.UUID, list] = defaultdict(list)
+    for r in results:
+        by_req[r.request_id].append(r)
+    samples: list[dict[str, Any]] = []
+    for req in reqs:
+        choice = choices.get(req.id)
+        rows = by_req.get(req.id) or []
+        if choice is None or not rows or not req.propensities:
+            continue
+        shown = next((r.payload.get("id") for r in rows if r.rank == 1), None)
+        engine = next((r.payload.get("id") for r in rows if (r.engine_rank or r.rank) == 1), None)
+        greedy = max(req.propensities.items(), key=lambda kv: kv[1])[0]
+        if shown is None or engine is None:
+            continue
+        samples.append({"shown": shown, "chosen": choice.route_id, "engine": engine, "greedy": greedy,
+                        "propensities": req.propensities, "explored": bool(req.explored)})
+    out = ips_from_samples(samples, epsilon)
+    out["explored"] = sum(1 for s in samples if s["explored"])
+    out["days"] = days
+    out["note"] = ("탐험 표본이 없으면 엔진 정책 추정은 개인화 1순위가 엔진 1순위와 같은 검색에만 기댄다. ESS 가 작으면 신뢰하지 않는다."
+                   if out["explored"] == 0 else "ε-greedy 로깅 확률로 보정한 추정. ESS 가 표본 수에 가까울수록 믿을 만하다.")
+    return out

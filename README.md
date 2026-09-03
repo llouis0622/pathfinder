@@ -1,5 +1,7 @@
 # Pathfinder
 
+[![CI](https://github.com/llouis0622/pathfinder/actions/workflows/ci.yml/badge.svg)](https://github.com/llouis0622/pathfinder/actions/workflows/ci.yml)
+
 부산 교통약자(휠체어·고령자·보행보조기·시각장애인)를 위한 **자체 경로 탐색** 서비스.
 OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·건물 그늘·경사·계단·엘리베이터를
 비용에 반영해 **ACO + GA**로 서로 다른 상위 3개 경로를 찾는다.
@@ -25,7 +27,22 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | Phase 2 | 데이터 파이프라인(OSM 보행망·DEM·지하철·버스·건물)과 PostGIS 스토어 | 완료 |
 | Phase 3 | 엔진 API, 백엔드(장소 검색·날씨·오케스트레이션·로그) | 완료 |
 | Phase 4 | 프론트엔드(MapLibre 지도 + 그래프 벡터 타일, 프로필·조건, Top 3 카드·구간 안내·경사/그늘/시설 오버레이, GPS 출발) | 완료 |
-| Phase 5 | Docker Compose, CI, 통합 검증 | 예정 |
+| Phase 5 | Docker Compose(개발용), GitHub Actions CI, 로그 보존·정리, 개인화 오프라인 평가(IPS), 그늘 시각 슬라이더, VWorld 건물 높이 병합 | 완료 |
+
+## Docker Compose 로 한 번에 띄우기
+
+```bash
+cp .env.example .env        # 키는 나중에 채워도 된다. 샘플 격자 도시로 바로 동작
+docker compose up --build   # db(PostGIS) · engine(8001) · backend(8000) · frontend(5173, vite dev)
+```
+
+- http://localhost:5173 서비스, http://localhost:5173/admin 관리자 (`.env` 의 `ADMIN_PASSWORD`)
+- 코드 폴더가 컨테이너에 마운트돼 수정이 바로 반영된다 (`--reload`, vite dev).
+- 부산 실데이터: `data/raw/south-korea-latest.osm.pbf` 를 받은 뒤
+  `docker compose --profile pipeline run --rm pipeline` → `.env` 의 `GRAPH_SOURCE=postgis_memory` → `docker compose restart engine`.
+  버스까지 넣으려면 먼저 `bims_fetch` 로 `data/build/bims` 를 만든다 ([docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) 8번).
+
+CI(GitHub Actions)는 push 마다 엔진(PostGIS 포함)·백엔드·프론트 테스트와 `docker compose config` 를 돌린다.
 
 ## 로컬 실행 (컨테이너 없이)
 

@@ -126,7 +126,7 @@ python -m app.pipeline.run_all --pbf ../data/raw/south-korea-latest.osm.pbf ...
   ```
   VWORLD_API_KEY=같은_인증키
   ```
-  현재 파이프라인은 OSM 건물 높이를 기본으로 쓰고, VWorld WFS 함수(`build_buildings.fetch_vworld`)는 코드에 있지만 `run_all` 명령에 아직 연결돼 있지 않다. 다음 세션에 `--vworld-key` 옵션으로 연결할 예정이니 키만 준비해 두면 된다.
+  9번 빌드 명령에 `--vworld-key 같은_인증키` 를 붙이거나 셸에 `export VWORLD_API_KEY=...` 를 두면 OSM 건물 중 높이를 모르는 것을 VWorld 실측 높이로 채운다 (없어도 빌드는 된다).
 
 **확인**: 프론트를 띄우고 지도가 회색이 아니라 국내 지도(건물 윤곽·동 이름)로 보이면 된다. 회색이면 브라우저 콘솔에서 `api.vworld.kr` 요청이 401/403 인지 본다 → 도메인 불일치가 대부분이다.
 
@@ -223,6 +223,8 @@ python -m app.pipeline.run_all \
 ```
 - 버스 없이 먼저 보려면 `--bims-cache` 를 빼도 된다 (도보+지하철만).
 - GTFS 가 있으면 `--bims-cache` 대신 `--gtfs 폴더경로`.
+- VWorld 키가 있으면 `--vworld-key "$VWORLD_API_KEY"` 를 붙인다 (건물 실측 높이).
+- Docker 로 돌리려면: `docker compose --profile pipeline run --rm pipeline` (루트 `.env` 의 `BUS_SERVICE_KEY`, `VWORLD_API_KEY` 를 읽는다).
 - 결과: `data/build/graph_bundle.npz`, `report.json`, 그리고 PostGIS 의 `graph_nodes/graph_edges/buildings` 테이블.
 - 걸리는 시간: PBF 읽기 포함 10~30분 (메모리 8GB 이상 권장).
 

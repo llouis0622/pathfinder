@@ -14,6 +14,7 @@ from .config import Settings, settings
 from .database import Database
 from .routers import router
 from .services import engine_client
+from .services.maintenance import start_retention
 
 log = logging.getLogger("backend")
 
@@ -28,7 +29,10 @@ def create_app(config: Settings | None = None) -> FastAPI:
         app.state.db = Database(cfg.database_url)
         await app.state.db.create_all()
         log.info("DB 준비 (%s)", cfg.database_url.split("@")[-1])
+        retention = start_retention(app)
         yield
+        if retention is not None:
+            retention.cancel()
         await app.state.db.dispose()
 
     app = FastAPI(title="Pathfinder Backend", description="교통약자 맞춤형 경로 추천 서비스 백엔드 API", version="0.4.0", lifespan=lifespan)

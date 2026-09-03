@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -38,6 +39,8 @@ def main() -> None:
     parser.add_argument("--skip-buildings", action="store_true")
     parser.add_argument("--no-compact", action="store_true")
     parser.add_argument("--no-dem", action="store_true")
+    parser.add_argument("--vworld-key", default=os.environ.get("VWORLD_API_KEY", ""),
+                        help="VWorld 오픈API 키. 주면 건물 실측 높이(LT_C_BLDGINFO)를 받아 OSM 높이를 보완한다 (환경변수 VWORLD_API_KEY)")
     args = parser.parse_args()
     out: Path = args.out
     out.mkdir(parents=True, exist_ok=True)
@@ -80,8 +83,16 @@ def main() -> None:
         from .build_buildings import build_from_pbf as build_buildings
 
         buildings = build_buildings(args.pbf, args.boundary)
-        save_buildings_json(buildings_path, buildings)
         report["buildings"] = {"count": len(buildings), "known_height": sum(1 for b in buildings if b.height_m is not None)}
+        if args.vworld_key:
+            from .build_buildings import fetch_vworld_buildings, merge_vworld_heights
+
+            bbox = (float(walk.nodes["lat"].min()), float(walk.nodes["lng"].min()), float(walk.nodes["lat"].max()), float(walk.nodes["lng"].max()))
+            vworld = fetch_vworld_buildings(bbox, args.vworld_key)
+            buildings, vw_report = merge_vworld_heights(buildings, vworld)
+            report["buildings"]["vworld"] = vw_report
+            report["buildings"]["known_height_after_vworld"] = sum(1 for b in buildings if b.height_m is not None)
+        save_buildings_json(buildings_path, buildings)
         print(f"[buildings] {report['buildings']}")
     elif buildings_path.is_file():
         buildings = load_buildings_json(buildings_path)

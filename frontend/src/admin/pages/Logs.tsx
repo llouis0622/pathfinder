@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { exportUrl, fetchAccess, fetchChoices, fetchEngineLogs, fetchPlaces, fetchRequests } from '../api'
+import { exportUrl, fetchAccess, fetchChoices, fetchEngineLogs, fetchMaintenance, fetchPlaces, fetchRequests, pruneLogs } from '../api'
 import { fmtMs, fmtNum, fmtPct } from '../charts'
 import { Card, Chips, Filters, HttpStatus, Input, KIND_LABEL, Loading, Pager, Rank, Select, Status, Table, UserChip, fmtDateTime, flagLabel, profileLabel, useFetch } from '../ui'
 
@@ -62,6 +62,42 @@ export function RequestsLog() {
   )
 }
 
+const TABLE_LABELS: Record<string, string> = { api_access_logs: '접근 로그', place_searches: '장소 검색', engine_runs: '엔진 성능' }
+
+function RetentionCard({ onPruned }: { onPruned: () => void }) {
+  const { data, loading, error, reload } = useFetch(fetchMaintenance, [])
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const prune = async (days: number) => {
+    const label = days === 0 ? '모든 접근·장소검색·엔진 로그를 지웁니다. 되돌릴 수 없어요.' : `${days}일보다 오래된 접근·장소검색·엔진 로그를 지웁니다.`
+    if (!window.confirm(label)) return
+    setBusy(true)
+    try {
+      const r = await pruneLogs(days)
+      setMsg(`정리 완료 · ${Object.entries(r.deleted).map(([t, n]) => `${TABLE_LABELS[t] ?? t} ${n.toLocaleString('ko-KR')}건`).join(', ')}`)
+      reload(); onPruned()
+    } catch (e) { setMsg(e instanceof Error ? e.message : '정리하지 못했어요') } finally { setBusy(false) }
+  }
+  return (
+    <Card title="보존 기간·정리" actions={data && <span className="adm-muted">자동 정리 {data.retention_days > 0 ? `${data.retention_days}일` : '꺼짐'}</span>}>
+      <Loading loading={loading} error={error}>
+        {data && (
+          <div className="adm-kv">
+            {Object.entries(data.tables).map(([t, v]) => (
+              <div key={t}>{TABLE_LABELS[t] ?? t}<b>{v.rows.toLocaleString('ko-KR')}건 <small className="adm-muted">{v.oldest ? `가장 오래됨 ${fmtDateTime(v.oldest)}` : ''}</small></b></div>
+            ))}
+          </div>
+        )}
+      </Loading>
+      <div className="adm__top-actions" style={{ marginTop: 12 }}>
+        <button type="button" className="adm-btn" disabled={busy || !data || data.retention_days === 0} onClick={() => data && prune(data.retention_days)}>보존 기간 지난 로그 정리</button>
+        <button type="button" className="adm-btn adm-btn--danger" disabled={busy} onClick={() => prune(0)}>전체 비우기</button>
+        {msg && <span className="adm-muted">{msg}</span>}
+      </div>
+    </Card>
+  )
+}
+
 export function AccessLog() {
   const [kind, setKind] = useState('')
   const [path, setPath] = useState('')
@@ -69,8 +105,10 @@ export function AccessLog() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const { page, setPage, reset } = usePage()
-  const { data, loading, error } = useFetch(() => fetchAccess({ page, size: 50, kind, path, status_min: statusMin || undefined, from, to }), [page, kind, path, statusMin, from, to])
+  const { data, loading, error, reload } = useFetch(() => fetchAccess({ page, size: 50, kind, path, status_min: statusMin || undefined, from, to }), [page, kind, path, statusMin, from, to])
   return (
+    <>
+    <RetentionCard onPruned={reload} />
     <Card title="접근·인증 로그" actions={<ExportLink kind="access" />}>
       <Filters onReset={() => { setKind(''); setPath(''); setStatusMin(''); setFrom(''); setTo(''); reset() }}>
         <Select label="종류" value={kind} onChange={(v) => { setKind(v); reset() }} options={[{ value: '', label: '전체' }, { value: 'api', label: 'API' }, { value: 'auth', label: '인증' }, { value: 'admin', label: '관리자' }]} />
@@ -97,6 +135,7 @@ export function AccessLog() {
         )}
       </Loading>
     </Card>
+    </>
   )
 }
 
