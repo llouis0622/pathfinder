@@ -232,3 +232,30 @@ class UserPlace(Base):
     lat: Mapped[float] = mapped_column(Float)
     lng: Mapped[float] = mapped_column(Float)
     sort: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AdminSetting(Base):
+    """관리자가 화면에서 바꾸는 설정 (알림 임계 등). 키 하나에 JSON 하나."""
+
+    __tablename__ = "admin_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class AlertEvent(Base):
+    """임계 초과·복구 알림 이력 (웹훅 전송 결과 포함)."""
+
+    __tablename__ = "alert_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    rule: Mapped[str] = mapped_column(String(32), index=True)
+    level: Mapped[str] = mapped_column(String(8), default="warn")      # warn | ok(복구) | test
+    message: Mapped[str] = mapped_column(Text, default="")
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str] = mapped_column(String(300), default="")

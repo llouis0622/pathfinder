@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from . import admin, audit
 from .config import Settings
 from .models import (
+    AlertEvent,
     ApiAccessLog,
     EdgeOverride,
     EngineRun,
@@ -32,7 +33,7 @@ from .models import (
 )
 from .reports import KIND_LABELS, report_out
 from .services import admin_stats as stats
-from .services import engine_client
+from .services import alerts, engine_client
 from .services.maintenance import log_counts, prune_logs
 from .services.personalization import Policy
 
@@ -523,6 +524,66 @@ async def data_quality(request: Request, cfg: Settings = Depends(get_settings), 
     active = int((await db.execute(select(func.count(EdgeOverride.id)).where(EdgeOverride.active.is_(True)))).scalar_one() or 0)
     cache = getattr(request.app.state, "search_cache", None)
     return {"graph": graph, "reports": report_counts, "active_overrides": active, "search_cache": (cache.stats() if cache else None)}
+
+
+# ---------------------------------------------------------------- 알림 (웹훅·임계)
+class AlertSettingsBody(BaseModel):
+    enabled: bool | None = None
+    webhook_url: str | None = Field(default=None, max_length=500)
+    format: str | None = None
+    interval_min: int | None = Field(default=None, ge=1, le=1440)
+    window_min: int | None = Field(default=None, ge=5, le=1440)
+    cooldown_min: int | None = Field(default=None, ge=0, le=10080)
+    rules: dict[str, dict[str, Any]] | None = None
+
+
+@guarded.get("/alerts/settings", summary="알림 설정 (웹훅·주기·임계)")
+async def alert_settings(cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    return alerts.public_settings(await alerts.load_settings(db, cfg))
+
+
+@guarded.put("/alerts/settings", summary="알림 설정 저장 (보낸 필드만 바뀐다)")
+async def alert_settings_save(body: AlertSettingsBody, request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "webhook_url" in patch and patch["webhook_url"] and not patch["webhook_url"].startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="웹훅 URL 은 http(s):// 로 시작해야 합니다")
+    if "rules" in patch:
+        unknown = set(patch["rules"]) - set(alerts.RULE_LABELS)
+        if unknown:
+            raise HTTPException(status_code=422, detail=f"알 수 없는 규칙: {', '.join(sorted(unknown))}")
+    saved = await alerts.save_settings(db, cfg, patch)
+    audit.mark(request, "admin", "alert_settings:" + ",".join(sorted(patch)))
+    return alerts.public_settings(saved)
+
+
+@guarded.post("/alerts/test", summary="웹훅으로 테스트 메시지 전송")
+async def alert_test(request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    s = await alerts.load_settings(db, cfg)
+    ev = AlertEvent(rule="test", level="test", message="관리자 화면에서 보낸 테스트 알림이에요")
+    ok, status, err = await alerts.send_webhook(s.get("webhook_url", ""), s.get("format", "slack"),
+                                                [{"rule": ev.rule, "level": ev.level, "message": ev.message, "value": None, "threshold": None}])
+    ev.sent, ev.http_status, ev.error = ok, status, err
+    db.add(ev)
+    await db.commit()
+    await db.refresh(ev)
+    audit.mark(request, "admin", f"alert_test:{'ok' if ok else 'fail'}")
+    return alerts.event_out(ev)
+
+
+@guarded.post("/alerts/evaluate", summary="지금 규칙을 평가하고 (설정돼 있으면) 알림 전송")
+async def alert_evaluate(request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    result = await alerts.run_once(request.app, db)
+    audit.mark(request, "admin", f"alert_evaluate:{len(result['findings'])}")
+    return result
+
+
+@guarded.get("/alerts/events", summary="알림 이력")
+async def alert_events(pg: Page = Depends(page_params), rule: str | None = Query(None), db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(AlertEvent).order_by(AlertEvent.created_at.desc())
+    if rule:
+        stmt = stmt.where(AlertEvent.rule == rule)
+    rows, total = await paginate(db, stmt, pg)
+    return {**envelope([alerts.event_out(r[0]) for r in rows], total, pg), "rule_labels": alerts.RULE_LABELS}
 
 
 # ---------------------------------------------------------------- CSV 내보내기

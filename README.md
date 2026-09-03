@@ -72,7 +72,11 @@ pip install -r requirements-dev.txt
 pytest -q            # PostGIS 통합 테스트는 PATHFINDER_TEST_DSN 접속이 될 때만 실행
 cd ../backend && pip install -r requirements-dev.txt && pytest -q   # 외부 API·엔진은 가짜 응답, DB는 SQLite
 cd ../frontend && npm install && npm run typecheck && npm test        # vitest + Testing Library
+# E2E (Playwright): 샘플 격자 엔진 + SQLite 백엔드를 띄운 뒤 실제 브라우저로 검색·공유·제보·관리자 흐름을 돈다
+scripts/e2e_up.sh start && (cd frontend && npx playwright install chromium && npm run e2e); scripts/e2e_up.sh stop
 ```
+
+CI(`.github/workflows/ci.yml`)는 엔진·백엔드·프론트 단위 테스트에 더해 같은 E2E 를 돌리고, 실패하면 Playwright 리포트를 아티팩트로 남긴다.
 
 ## 프론트엔드 구성
 
@@ -82,6 +86,7 @@ cd ../frontend && npm install && npm run typecheck && npm test        # vitest +
 - `src/components/RouteRow.tsx`, `RouteDetail.tsx`: 네이버·카카오 길찾기식 경로 행(소요시간·수단 바·요약·태그)과 세로 타임라인 상세.
 - `src/components/ProfileChips.tsx`: 이용자 유형 4종 칩과 "그늘 우선" 토글. 날씨는 선택 없이 실시간으로 반영되고, 경사 회피는 항상 켜져 있다.
 - 디자인: 화이트·블랙·그레이 톤(토스 스타일), 지하철 노선색만 정보 표시용으로 유지. 길찾기 패널은 카카오맵·네이버지도처럼 지도 위 상단에 뜬다.
+- 사용자 편의: 접근성 메뉴(큰 글씨·고대비·음성 안내), 화면 읽기 프로그램용 실시간 알림과 키보드 탐색, 즐겨찾기·최근 검색, 경로 공유 링크(`/r/:id`), PWA 설치(오프라인 셸·타일 캐시), 시설 제보(관리자 검토 후 경로에 반영), 첫 방문 안내, 결과 없음 대안, 다크 모드.
 - 로그인: 카카오·네이버 OAuth. 로그인 후 "이 경로로 가기"를 누르면 취향이 학습되어 다음 추천 순위에 반영된다 (`ALLOW_DEV_LOGIN=true`면 키 없이 데모 계정으로 체험).
 
 합성 격자 도시(`data/samples/grid_city.npz`)로 엔진 전체를 검증한다. 실제 부산 그래프 빌드는

@@ -36,3 +36,8 @@ data/raw/
 .vscode/
 .DS_Store
 *.log
+
+# E2E
+.e2e/
+frontend/playwright-report/
+frontend/test-results/

@@ -148,3 +148,44 @@ export const fetchUsers = (params: Record<string, string | number | undefined>) 
 export const fetchUserDetail = (id: string) => call<UserDetail>(`/api/admin/users/${id}`)
 export const resetUserPolicy = (id: string) => call<{ ok: boolean; reset: boolean }>(`/api/admin/users/${id}/policy`, { method: 'DELETE' })
 export const exportUrl = (kind: 'requests' | 'choices' | 'users' | 'access' | 'engine', days = 30) => `/api/admin/export/${kind}.csv${qs({ days })}`
+
+// ---------------------------------------------------------------- 운영: 데이터 품질·제보·알림
+type Tri = { yes: number; no: number; unknown: number }
+export type GraphStats = {
+  source?: string; error?: string
+  nodes?: { total: number; by_kind: Record<string, number> }
+  edges?: { total: number; by_kind: Record<string, number> }
+  walk?: { edges: number; length_km?: number; grade_coverage: number | null; width_coverage?: number | null; surface_coverage?: number | null
+    stairs?: number; stairs_without_ramp?: number; steep_over_10pct?: number; kerbs?: Record<string, number>; crossings?: Record<string, number>; tactile?: Tri; lit?: Tri }
+  vertical?: { edges?: number; elevator: Tri; escalator?: Tri }
+  transit?: { stops: number; platforms: number; entrances: number; routes: number; low_floor_known: number }
+  buildings?: { total: number; height_known: number; height_coverage: number | null }
+  connectivity?: { components: number; largest_share: number | null; isolated_walk_nodes: number }
+}
+export type DataQuality = { graph: GraphStats; reports: Record<string, number>; active_overrides: number
+  search_cache: { size: number; maxsize: number; hits: number; misses: number; hit_rate?: number | null; ttl_s?: number } | null }
+export type ReportRow = { id: string; created_at: string; user_id: string | null; user: UserRef | null; request_id: string | null; lat: number; lng: number
+  kind: string; kind_label: string; note: string; place_name: string; status: string; edge_id: number | null; edge_kind: string; admin_note: string | null; resolved_at: string | null }
+export type OverrideRow = { id: string; created_at: string; edge_id: number; kind: string; kind_label: string; active: boolean; expires_at: string | null; note: string
+  report_id: string | null; deactivated_at: string | null }
+export type AlertRule = { enabled: boolean; threshold?: number; min_samples?: number }
+export type AlertSettings = { enabled: boolean; webhook_url: string; webhook_url_masked: string; webhook_configured: boolean; format: 'slack' | 'json'
+  interval_min: number; window_min: number; cooldown_min: number; rules: Record<string, AlertRule>; rule_labels: Record<string, string> }
+export type AlertEventRow = { id: string; created_at: string; rule: string; rule_label: string; level: string; message: string; value: number | null
+  threshold: number | null; sent: boolean; http_status: number | null; error: string }
+export type AlertFinding = { rule: string; value: number | null; threshold: number | null; message: string }
+
+export const fetchDataQuality = () => call<DataQuality>('/api/admin/data-quality')
+export const fetchReports = (params: Record<string, string | number | undefined>) => call<Paged<ReportRow> & { counts: Record<string, number>; kinds: Record<string, string> }>(`/api/admin/reports${qs(params)}`)
+export const acceptReport = (id: string, body: { edge_id?: number; kind?: string; expires_days?: number; note?: string }) =>
+  call<{ report: ReportRow; override: OverrideRow }>(`/api/admin/reports/${id}/accept`, { method: 'POST', body: JSON.stringify(body) })
+export const rejectReport = (id: string, note: string) => call<ReportRow>(`/api/admin/reports/${id}/reject`, { method: 'POST', body: JSON.stringify({ note }) })
+export const fetchOverrides = (params: Record<string, string | number | boolean | undefined>) => call<Paged<OverrideRow>>(`/api/admin/overrides${qs(params)}`)
+export const createOverride = (body: { edge_id: number; kind: string; expires_days?: number; note?: string }) => call<OverrideRow>('/api/admin/overrides', { method: 'POST', body: JSON.stringify(body) })
+export const deactivateOverride = (id: string) => call<OverrideRow>(`/api/admin/overrides/${id}`, { method: 'DELETE' })
+export const fetchAlertSettings = () => call<AlertSettings>('/api/admin/alerts/settings')
+export const saveAlertSettings = (patch: Partial<Omit<AlertSettings, 'rules'>> & { rules?: Record<string, AlertRule> }) =>
+  call<AlertSettings>('/api/admin/alerts/settings', { method: 'PUT', body: JSON.stringify(patch) })
+export const testAlert = () => call<AlertEventRow>('/api/admin/alerts/test', { method: 'POST' })
+export const evaluateAlerts = () => call<{ findings: AlertFinding[]; sent: AlertEventRow[]; enabled: boolean; webhook_configured: boolean }>('/api/admin/alerts/evaluate', { method: 'POST' })
+export const fetchAlertEvents = (params: Record<string, string | number | undefined>) => call<Paged<AlertEventRow> & { rule_labels: Record<string, string> }>(`/api/admin/alerts/events${qs(params)}`)
