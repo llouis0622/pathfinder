@@ -77,6 +77,44 @@ async def weather(lat: float = Query(..., ge=-90, le=90), lng: float = Query(...
     return await get_weather(cfg, lat, lng, at)
 
 
+# ---------------------------------------------------------------- 지도 타일·그늘 (엔진 프록시)
+TILE_CACHE = {"Cache-Control": "public, max-age=3600"}
+
+
+@router.get("/tiles/meta", summary="그래프 벡터 타일 메타")
+async def tiles_meta(cfg: Settings = Depends(get_settings)) -> dict:
+    try:
+        return await engine_client.tiles_meta(cfg)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail="엔진에 연결할 수 없습니다") from exc
+
+
+@router.get("/tiles/{z}/{x}/{y}.mvt", summary="그래프 벡터 타일 (경사·계단·턱·시설·정류장)")
+async def tile(z: int, x: int, y: int, cfg: Settings = Depends(get_settings)) -> Response:
+    try:
+        status, content = await engine_client.tile(cfg, z, x, y)
+    except engine_client.EngineError as exc:
+        raise HTTPException(status_code=503, detail=exc.detail) from exc
+    if status == 204:
+        return Response(status_code=204, headers=TILE_CACHE)
+    if status != 200:
+        raise HTTPException(status_code=404 if status == 404 else 502, detail="타일을 만들지 못했습니다")
+    return Response(content=content, media_type=engine_client.MVT_MEDIA_TYPE, headers=TILE_CACHE)
+
+
+@router.get("/shade", summary="화면 범위의 보행 엣지 그늘 비율 (실시간 태양 위치)")
+async def shade(min_lat: float = Query(..., ge=-90, le=90), min_lng: float = Query(..., ge=-180, le=180),
+                max_lat: float = Query(..., ge=-90, le=90), max_lng: float = Query(..., ge=-180, le=180),
+                at: datetime | None = Query(None), cfg: Settings = Depends(get_settings)) -> dict:
+    params: dict = {"min_lat": min_lat, "min_lng": min_lng, "max_lat": max_lat, "max_lng": max_lng}
+    if at is not None:
+        params["at"] = at.isoformat()
+    try:
+        return await engine_client.shade(cfg, params)
+    except engine_client.EngineError as exc:
+        raise HTTPException(status_code=exc.status if exc.status in (422, 503) else 502, detail=exc.detail) from exc
+
+
 # ---------------------------------------------------------------- 경로
 @router.post("/route", response_model=RouteSearchResponse, summary="교통약자 맞춤 경로 Top 3 (로그인 시 개인화 재정렬)")
 async def route(req: RouteSearchRequest, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db),

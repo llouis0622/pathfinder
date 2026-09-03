@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
+from .. import tiles
 from ..cost.profiles import PROFILES
 from ..routes.schemas import SearchRequest, SearchResponse
 from ..search.aco import ACOParams
@@ -50,3 +53,32 @@ def search(request: Request, body: SearchRequest) -> SearchResponse:
     except Exception as exc:  # noqa: BLE001
         log.exception("탐색 실패")
         raise HTTPException(status_code=500, detail=f"탐색 중 오류: {type(exc).__name__}") from exc
+
+
+# ---------------------------------------------------------------- 지도 타일·그늘
+@router.get("/tiles/meta", summary="벡터 타일 메타 (최소 줌, 레이어)")
+def tiles_meta() -> dict:
+    return tiles.tile_meta()
+
+
+@router.get("/tiles/{z}/{x}/{y}.mvt", summary="그래프 벡터 타일 (edges · facilities · stops)")
+def tile(request: Request, z: int, x: int, y: int) -> Response:
+    if not tiles.valid_tile(z, x, y):
+        raise HTTPException(status_code=404, detail="타일 좌표가 올바르지 않습니다")
+    data = tiles.render_tile(request.app.state.store, z, x, y)
+    headers = {"Cache-Control": "public, max-age=3600"}
+    if not data:
+        return Response(status_code=204, headers=headers)
+    return Response(content=data, media_type=tiles.MVT_MEDIA_TYPE, headers=headers)
+
+
+@router.get("/shade", summary="화면 범위의 보행 엣지 그늘 비율 (시각 기준)")
+def shade(request: Request, min_lat: float = Query(..., ge=-90, le=90), min_lng: float = Query(..., ge=-180, le=180),
+          max_lat: float = Query(..., ge=-90, le=90), max_lng: float = Query(..., ge=-180, le=180), at: datetime | None = Query(None)) -> dict:
+    moment = at or datetime.now(ZoneInfo("Asia/Seoul"))
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=ZoneInfo("Asia/Seoul"))
+    try:
+        return tiles.shade_for_bbox(request.app.state.store, (min_lat, min_lng, max_lat, max_lng), moment)
+    except tiles.ShadeBboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

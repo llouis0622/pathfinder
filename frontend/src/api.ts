@@ -1,4 +1,4 @@
-import type { AuthProviders, ChooseResponse, Place, Preferences, Profile, Route, RouteSearchRequest, RouteSearchResponse, User, Weather } from './types'
+import type { ShadeResponse, AuthProviders, ChooseResponse, Place, Preferences, Profile, Route, RouteSearchRequest, RouteSearchResponse, User, Weather } from './types'
 
 // VITE_BACKEND_URL 이 비어 있으면 같은 오리진의 /api 를 쓴다 (vite proxy / nginx).
 const base = (import.meta.env.VITE_BACKEND_URL ?? '').replace(/\/$/, '')
@@ -86,4 +86,17 @@ export function fetchPreferences(): Promise<Preferences> {
 
 export function resetPreferences(): Promise<{ ok: boolean }> {
   return request('/api/me/preferences', { method: 'DELETE' })
+}
+
+/** 화면 범위의 보행 엣지 그늘 비율 (엣지 id → 0~1). 범위가 넓으면 422. */
+export async function fetchShade(bbox: { min_lat: number; min_lng: number; max_lat: number; max_lng: number; at?: string }, signal?: AbortSignal): Promise<ShadeResponse> {
+  const p = new URLSearchParams()
+  Object.entries(bbox).forEach(([k, v]) => { if (v !== undefined) p.set(k, String(v)) })
+  const res = await fetch(`/api/shade?${p.toString()}`, { credentials: 'include', signal })
+  if (!res.ok) {
+    let detail = `그늘을 불러오지 못했어요 (${res.status})`
+    try { const body = await res.json(); if (typeof body?.detail === 'string') detail = body.detail } catch { /* 본문 없음 */ }
+    throw new ApiError(res.status, detail)
+  }
+  return res.json() as Promise<ShadeResponse>
 }

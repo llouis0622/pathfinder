@@ -12,6 +12,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md) | OSM·DEM·지하철·버스·건물 빌드와 PostGIS 스키마 |
 | [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md) | 카카오·네이버 로그인과 RL(컨텍스트 밴딧) 개인화 재정렬 |
 | [docs/ADMIN.md](docs/ADMIN.md) | 관리자 페이지: 로그·사용자·취향·분석 대시보드, 접근 로그, CSV 내보내기 |
+| [docs/MAP.md](docs/MAP.md) | MapLibre 지도: VWorld/OSM 배경, 그래프 벡터 타일, 실시간 그늘, GPS 출발 |
 
 ## 진행 상태
 
@@ -21,7 +22,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | Phase 1 | 엔진 코어: 멀티모달 그래프, 4개 프로필 비용 모델, ACO + GA, Top 3 다양성, 그늘·경사·배지 | 완료 |
 | Phase 2 | 데이터 파이프라인(OSM 보행망·DEM·지하철·버스·건물)과 PostGIS 스토어 | 완료 |
 | Phase 3 | 엔진 API, 백엔드(장소 검색·날씨·오케스트레이션·로그) | 완료 |
-| Phase 4 | 프론트엔드(Kakao 지도 / 약식 SVG 지도, 프로필·조건, Top 3 카드·구간 안내·경사/그늘 오버레이) | 완료 |
+| Phase 4 | 프론트엔드(MapLibre 지도 + 그래프 벡터 타일, 프로필·조건, Top 3 카드·구간 안내·경사/그늘/시설 오버레이, GPS 출발) | 완료 |
 | Phase 5 | Docker Compose, CI, 통합 검증 | 예정 |
 
 ## 로컬 실행 (컨테이너 없이)
@@ -37,7 +38,7 @@ DATABASE_URL=postgresql+asyncpg://pathfinder:pathfinder_dev@localhost:5432/pathf
 curl -X POST localhost:8000/api/route -H 'content-type: application/json' \
   -d '{"origin":{"lat":35.15,"lng":129.06},"destination":{"lat":35.1536,"lng":129.0726},"profile":"wheelchair"}'
 # 프론트엔드 (vite dev 서버가 /api 를 8000 으로 프록시)
-cd frontend && npm install && cp .env.example .env   # VITE_KAKAO_MAP_KEY 입력 (없으면 SVG 약식 지도)
+cd frontend && npm install && cp .env.example .env   # VITE_VWORLD_KEY 입력 (없으면 OpenFreeMap OSM 배경)
 npm run dev                                          # http://localhost:5173
 ```
 
@@ -57,7 +58,7 @@ cd ../frontend && npm install && npm run typecheck && npm test        # vitest +
 ## 프론트엔드 구성
 
 - `src/types.ts`: 엔진 `RouteOut` 과 1:1 인 타입. 백엔드가 경로를 그대로 전달하므로 이 파일만 맞추면 된다.
-- `src/components/MapView.tsx`: Kakao 지도. 선택 경로를 구간별 색(도보·지하철·버스)으로 그리고, "경사"/"그늘" 오버레이는 보행 구간을 경사 등급·그늘 비율로 칠한다.
+- `src/components/MapView.tsx`: MapLibre 지도(VWorld 또는 OSM 배경). 우리 그래프를 벡터 타일로 얹어 확대하면 경사·계단·턱·시설·정류장이 보이고, "그늘" 은 화면 범위를 실시간 계산해 칠한다. GPS 로 현재 위치에서 출발할 수 있다. 자세한 내용은 [docs/MAP.md](docs/MAP.md).
   키가 없으면 `SchematicMap.tsx`(SVG 약식 지도)로 자동 대체된다.
 - `src/components/RouteRow.tsx`, `RouteDetail.tsx`: 네이버·카카오 길찾기식 경로 행(소요시간·수단 바·요약·태그)과 세로 타임라인 상세.
 - `src/components/ProfileChips.tsx`: 이용자 유형 4종 칩과 "그늘 우선" 토글. 날씨는 선택 없이 실시간으로 반영되고, 경사 회피는 항상 켜져 있다.

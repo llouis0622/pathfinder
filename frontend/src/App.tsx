@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, chooseRoute, fetchProfiles, searchRoutes } from './api'
 import AuthMenu from './components/AuthMenu'
-import MapView from './components/MapView'
+import MapView, { type LocatedPoint } from './components/MapView'
 import ProfileChips from './components/ProfileChips'
 import RouteDetail from './components/RouteDetail'
 import RouteRow from './components/RouteRow'
@@ -33,6 +33,8 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(true)
   const [inset, setInset] = useState<MapInset>(ZERO_INSET)
+  const [myLocation, setMyLocation] = useState<LocatedPoint | null>(null)
+  const [zoom, setZoom] = useState(12)
   const dockRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
@@ -125,13 +127,18 @@ export default function App() {
   return (
     <div className={`app app--${view}${result && !sheetOpen ? ' app--sheet-closed' : ''}`}>
       <main className="map">
-        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} inset={inset} onSelect={setSelectedId} />
-        {result && (
-          <div className="map__tools" role="radiogroup" aria-label="지도 표시">
-            {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘']] as [MapOverlay, string][]).map(([k, label]) => (
-              <button key={k} type="button" role="radio" aria-checked={overlay === k} className={`map__tool${overlay === k ? ' is-on' : ''}`} onClick={() => setOverlay(k)}>{label}</button>
-            ))}
-          </div>
+        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} inset={inset}
+          departureAt={result?.departure_at ?? null} onSelect={setSelectedId} onLocate={setMyLocation} onZoom={setZoom} />
+        <div className="map__tools" role="radiogroup" aria-label="지도 표시">
+          {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘'], ['facility', '시설']] as [MapOverlay, string][]).map(([k, label]) => (
+            <button key={k} type="button" role="radio" aria-checked={overlay === k} className={`map__tool${overlay === k ? ' is-on' : ''}`} onClick={() => setOverlay(k)}>{label}</button>
+          ))}
+        </div>
+        {overlay !== 'mode' && zoom < 15 && <div className="map__hint">지도를 확대하면 {overlay === 'grade' ? '경사' : overlay === 'shade' ? '그늘' : '시설'}이 표시돼요</div>}
+        {myLocation && origin?.id !== 'current' && (
+          <button type="button" className="map__locate" onClick={() => setOrigin({ id: 'current', name: '현재 위치', address: '', lat: myLocation.lat, lng: myLocation.lng, category: '', source: 'geolocation' })}>
+            내 위치에서 출발
+          </button>
         )}
       </main>
 

@@ -104,7 +104,7 @@ export default function SchematicMap({ origin, destination, routes, selectedId, 
           style={{ cursor: 'pointer' }} onClick={() => onSelect(r.id)} />
       ))}
       {selected && selected.legs.map((leg, i) => {
-        if (leg.kind === 'walk' && overlay !== 'mode') {
+        if (leg.kind === 'walk' && (overlay === 'grade' || overlay === 'shade')) {
           return leg.segments.map((seg, j) => (
             <polyline key={`${i}-${j}`} points={toPoints(seg.path)} fill="none" strokeWidth={8} strokeLinecap="round"
               stroke={overlay === 'grade' ? gradeColor(seg.grade_pct) : shadeColor(seg.shade_ratio)} />

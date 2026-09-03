@@ -222,6 +222,18 @@ class PostgisGraphStore:
             out.append(Building(id=int(bid), height_m=(None if height is None else float(height)), footprint=footprint, holes=holes))
         return out
 
+    def bbox_graph(self, bbox: tuple[float, float, float, float]) -> Graph:
+        """bbox 안의 노드와 보행·연결 엣지 (그늘 계산용)."""
+        min_lat, min_lng, max_lat, max_lng = bbox
+        params = {"min_lng": min_lng, "min_lat": min_lat, "max_lng": max_lng, "max_lat": max_lat}
+        node_sql = _NODE_SELECT + " WHERE geom && ST_MakeEnvelope(%(min_lng)s, %(min_lat)s, %(max_lng)s, %(max_lat)s, 4326)"
+        edge_sql = _EDGE_SELECT + """ WHERE kind IN ('walk', 'link')
+            AND geom && ST_MakeEnvelope(%(min_lng)s, %(min_lat)s, %(max_lng)s, %(max_lat)s, 4326)"""
+        with self._conn() as conn:
+            node_rows = conn.execute(node_sql, params).fetchall()
+            edge_rows = conn.execute(edge_sql, params).fetchall()
+        return _rows_to_graph(node_rows, edge_rows)
+
     def load_full(self) -> Graph:
         with self._conn() as conn:
             node_rows = conn.execute(_NODE_SELECT).fetchall()
