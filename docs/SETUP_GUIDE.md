@@ -279,6 +279,18 @@ GPS(현재 위치)는 브라우저 정책상 **HTTPS 에서만** 동작한다 (l
 
 ---
 
+### 11-b. Slack 알림 웹훅 (선택, 운영 권장)
+
+임계를 넘으면(엔진 다운, 오류율, 경로 없음 비율, 엔진 p95, 서버 5xx, 미처리 제보) Slack 채널로 알린다.
+
+1. https://api.slack.com/apps → **Create New App** → From scratch → 워크스페이스 선택
+2. 왼쪽 **Incoming Webhooks** → Activate 켜기 → **Add New Webhook to Workspace** → 채널 선택
+3. 생성된 `https://hooks.slack.com/services/T…/B…/…` 를 복사
+4. 기입: 둘 중 하나
+   - 관리자 화면 `/admin/alerts` → 웹훅 URL 붙여넣기 → 저장 → **테스트 전송** (DB 에 저장, 재배포해도 유지)
+   - 또는 `.env` 의 `ALERT_WEBHOOK_URL=` 에 넣기 (화면에서 저장한 값이 있으면 그쪽이 우선)
+5. 임계값은 같은 화면의 "규칙·임계" 표에서 바꾼다. 형식을 JSON 으로 두면 Discord·Teams·자체 서버로도 받을 수 있다.
+
 ## 12. 다 채운 뒤 최종 점검 순서
 
 1. `backend/.env`, `engine/.env`, `frontend/.env` 세 파일이 있고 위 값들이 들어갔는지 본다.

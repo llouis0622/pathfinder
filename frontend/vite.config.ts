@@ -22,6 +22,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],   // e2e/*.spec.ts 는 Playwright 가 돌린다
     css: false,
   },
 })

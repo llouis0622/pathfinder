@@ -87,6 +87,16 @@
 .adm-summary i { font-style: normal; font-size: 13px; font-weight: 700; background: var(--g900); color: var(--white); border-radius: 999px; padding: 5px 10px; }
 .adm-map { position: relative; height: 320px; border-radius: 12px; overflow: hidden; background: var(--g100); }
 
+/* 운영 화면 폼 */
+.adm-inline { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
+.adm-inline--tight { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+.adm-num { width: 84px; border: 1px solid var(--g300); border-radius: 8px; padding: 5px 8px; font-size: 13px; background: var(--white); color: var(--g900); }
+.adm-check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--g900); font-weight: 600; padding: 8px 0; }
+.adm-check input { width: 16px; height: 16px; accent-color: var(--g900); }
+.adm-list { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.adm-list li { display: flex; align-items: center; gap: 8px; }
+.adm-card code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--g100); border-radius: 4px; padding: 1px 5px; }
+
 /* 로그인 */
 .adm-login { min-height: 100dvh; display: grid; place-items: center; background: var(--g50); padding: 24px; }
 .adm-login__box { width: min(380px, 100%); background: var(--white); border: 1px solid var(--g200); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px; }

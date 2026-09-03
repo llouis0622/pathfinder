@@ -34,6 +34,9 @@ class FakeExternal:
         }
         self.open_meteo_air = {"current": {"pm10": 40.0}, "hourly": {"time": ["2036-01-01T09:00"], "pm10": [95.0]}}
         self.open_meteo_fail = False
+        self.webhook_calls: list[dict] = []
+        self.webhook_status = 200
+        self.engine_health_ok = True
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         host = request.url.host
@@ -46,7 +49,12 @@ class FakeExternal:
         if host in ("engine", "localhost", "127.0.0.1") and path == "/api/profiles":
             return httpx.Response(200, json=[{"id": "wheelchair", "label": "휠체어 이용자", "description": "d", "speed_mps": 1.0}])
         if host in ("engine", "localhost", "127.0.0.1") and path == "/health":
+            if not self.engine_health_ok:
+                return httpx.Response(503, text="down")
             return httpx.Response(200, json={"status": "ok"})
+        if host == "hooks.example.test":
+            self.webhook_calls.append(json.loads(request.content))
+            return httpx.Response(self.webhook_status, text="ok" if self.webhook_status < 300 else "invalid_token")
         if host in ("engine", "localhost", "127.0.0.1") and path == "/api/nearest-edge":
             if float(request.url.params["lat"]) > 80:
                 return httpx.Response(422, json={"detail": "반경 안에 보행 엣지가 없습니다"})
