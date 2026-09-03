@@ -78,7 +78,7 @@ jobs:
       - run: npx vite build
 
   e2e:
-    name: e2e (Playwright: engine + backend + vite)
+    name: "e2e (Playwright: engine + backend + vite)"
     runs-on: ubuntu-latest
     needs: [frontend]
     steps:
