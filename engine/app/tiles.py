@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
 from datetime import datetime
 from typing import Any
 
@@ -292,3 +293,96 @@ def shade_for_bbox(store: Any, bbox: tuple[float, float, float, float], moment: 
         "solar_azimuth_deg": info.solar_azimuth_deg, "building_count": info.building_count, "note": info.note,
         "edges": graph.num_edges, "ratios": out,
     }
+
+
+# ---------------------------------------------------------------- 타일 LRU 캐시
+class TileCache:
+    """(z, x, y) → bytes. 그래프는 프로세스 수명 동안 바뀌지 않으므로 TTL 없이 크기만 제한한다."""
+
+    def __init__(self, maxsize: int = 4096) -> None:
+        self.maxsize = int(maxsize)
+        self._items: OrderedDict[tuple[int, int, int], bytes] = OrderedDict()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: tuple[int, int, int]) -> bytes | None:
+        if key in self._items:
+            self._items.move_to_end(key)
+            self.hits += 1
+            return self._items[key]
+        self.misses += 1
+        return None
+
+    def put(self, key: tuple[int, int, int], value: bytes) -> None:
+        if self.maxsize <= 0:
+            return
+        self._items[key] = value
+        self._items.move_to_end(key)
+        while len(self._items) > self.maxsize:
+            self._items.popitem(last=False)
+
+    def clear(self) -> None:
+        self._items.clear()
+
+    def stats(self) -> dict[str, Any]:
+        return {"maxsize": self.maxsize, "size": len(self._items), "hits": self.hits, "misses": self.misses,
+                "bytes": sum(len(v) for v in self._items.values())}
+
+
+def render_tile_cached(store: Any, cache: TileCache, z: int, x: int, y: int) -> bytes:
+    key = (z, x, y)
+    data = cache.get(key)
+    if data is None:
+        data = render_tile(store, z, x, y)
+        cache.put(key, data)
+    return data
+
+
+# ---------------------------------------------------------------- 가장 가까운 엣지 (시설 제보 위치 → 엣지)
+def _point_segment_m(lat: float, lng: float, a: tuple[float, float], b: tuple[float, float]) -> float:
+    """점과 선분 거리(m). 작은 범위이므로 등장방형 근사."""
+    k = math.cos(math.radians(lat))
+    px, py = lng * k, lat
+    ax, ay = a[1] * k, a[0]
+    bx, by = b[1] * k, b[0]
+    dx, dy = bx - ax, by - ay
+    if dx == 0 and dy == 0:
+        t = 0.0
+    else:
+        t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    qx, qy = ax + t * dx, ay + t * dy
+    return math.hypot((px - qx) * 111320.0, (py - qy) * 111320.0)
+
+
+def nearest_edge(store: Any, lat: float, lng: float, max_distance_m: float = 60.0, kinds: tuple[str, ...] = SHOWN_EDGE_KINDS) -> dict | None:
+    """좌표에서 가장 가까운 보행·연결·수직 엣지. 없으면 None."""
+    if isinstance(store, MemoryGraphStore):
+        g = store.graph
+        d = max_distance_m / 111320.0 * 1.5
+        cand = edge_index(store).query((lat - d, lng - d, lat + d, lng + d))
+        best: tuple[float, int] | None = None
+        for e in cand:
+            if g.edges["kind"][e] not in kinds:
+                continue
+            pts = g.edge_geometry(int(e))
+            dist = min(_point_segment_m(lat, lng, pts[i], pts[i + 1]) for i in range(len(pts) - 1)) if len(pts) >= 2 else float("inf")
+            if dist <= max_distance_m and (best is None or dist < best[0]):
+                best = (dist, int(e))
+        if best is None:
+            return None
+        e = best[1]
+        return {"edge_id": int(g.edges["id"][e]), "kind": str(g.edges["kind"][e]), "distance_m": round(best[0], 1),
+                "stairs": int(g.edges["stairs"][e]), "elevator": int(g.edges["elevator"][e]), "kerb": str(g.edges["kerb"][e]),
+                "name": str(g.edges["stop_name"][e])}
+    sql = """
+        SELECT id, kind, stairs, elevator, kerb, stop_name,
+               ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint(%(lng)s, %(lat)s), 4326)::geography) AS d
+        FROM graph_edges WHERE kind = ANY(%(kinds)s)
+        ORDER BY geom <-> ST_SetSRID(ST_MakePoint(%(lng)s, %(lat)s), 4326) LIMIT 1
+    """
+    with store._conn() as conn:
+        row = conn.execute(sql, {"lat": lat, "lng": lng, "kinds": list(kinds)}).fetchone()
+    if row is None or row[6] > max_distance_m:
+        return None
+    return {"edge_id": int(row[0]), "kind": str(row[1]), "distance_m": round(float(row[6]), 1), "stairs": int(row[2]), "elevator": int(row[3]),
+            "kerb": str(row[4] or ""), "name": str(row[5] or "")}

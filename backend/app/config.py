@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     admin_login_lockout_s: int = 300
     access_log_enabled: bool = True                       # 모든 /api 호출을 api_access_logs 에 기록
     log_retention_days: int = 90                          # 접근·장소검색·엔진 로그 보존 일수 (0 = 지우지 않음)
+    # ---- 관측성·캐시·제보 ----
+    metrics_enabled: bool = True                          # /metrics (Prometheus)
+    log_format: str = "text"                              # text | json
+    search_cache_ttl_s: int = 600                         # 같은 출발·도착·프로필·시간대 검색 결과 재사용 (0 = 끔)
+    search_cache_size: int = 500
+    report_rate_limit_per_hour: int = 20                  # IP 당 시설 제보 한도
 
     @property
     def cors_origin_list(self) -> list[str]:

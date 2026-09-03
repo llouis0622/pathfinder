@@ -7,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from prometheus_client import Counter, Histogram
 from pydantic import BaseModel
 
 from .. import tiles
@@ -15,9 +16,14 @@ from ..routes.schemas import SearchRequest, SearchResponse
 from ..search.aco import ACOParams
 from ..search.ga import GAParams
 from ..search.pipeline import NoRouteError, search_routes
+from ..stats import store_stats
 
 log = logging.getLogger("engine.api")
 router = APIRouter(prefix="/api", tags=["engine"])
+
+SEARCHES = Counter("pathfinder_engine_searches_total", "엔진 탐색 수", ["profile", "status"])
+SEARCH_SECONDS = Histogram("pathfinder_engine_search_seconds", "엔진 탐색 시간(초)", ["profile"], buckets=(0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 30))
+TILES = Counter("pathfinder_engine_tiles_total", "타일 요청", ["result"])
 
 PROFILE_DESCRIPTIONS = {
     "wheelchair": "계단·급경사·좁은 보도·턱을 피하고 엘리베이터와 저상버스만 이용합니다.",
@@ -46,13 +52,21 @@ def search(request: Request, body: SearchRequest) -> SearchResponse:
     ga = GAParams(generations=cfg.ga_generations, time_budget_s=cfg.engine_time_budget_s * 0.3)
     if body.options.time_budget_s is None:
         body.options.time_budget_s = cfg.engine_time_budget_s
+    import time as _time
+
+    started = _time.perf_counter()
     try:
-        return search_routes(request.app.state.store, body, replace(aco), replace(ga))
+        result = search_routes(request.app.state.store, body, replace(aco), replace(ga))
     except NoRouteError as exc:
+        SEARCHES.labels(body.profile, "no_route").inc()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
+        SEARCHES.labels(body.profile, "error").inc()
         log.exception("탐색 실패")
         raise HTTPException(status_code=500, detail=f"탐색 중 오류: {type(exc).__name__}") from exc
+    SEARCHES.labels(body.profile, "ok").inc()
+    SEARCH_SECONDS.labels(body.profile).observe(_time.perf_counter() - started)
+    return result
 
 
 # ---------------------------------------------------------------- 지도 타일·그늘
@@ -65,11 +79,33 @@ def tiles_meta() -> dict:
 def tile(request: Request, z: int, x: int, y: int) -> Response:
     if not tiles.valid_tile(z, x, y):
         raise HTTPException(status_code=404, detail="타일 좌표가 올바르지 않습니다")
-    data = tiles.render_tile(request.app.state.store, z, x, y)
-    headers = {"Cache-Control": "public, max-age=3600"}
+    cache = request.app.state.tile_cache
+    before = cache.hits
+    data = tiles.render_tile_cached(request.app.state.store, cache, z, x, y)
+    TILES.labels("hit" if cache.hits > before else ("empty" if not data else "miss")).inc()
+    headers = {"Cache-Control": "public, max-age=3600", "X-Tile-Cache": "hit" if cache.hits > before else "miss"}
     if not data:
         return Response(status_code=204, headers=headers)
     return Response(content=data, media_type=tiles.MVT_MEDIA_TYPE, headers=headers)
+
+
+@router.get("/tiles/cache", summary="타일 캐시 상태")
+def tile_cache_stats(request: Request) -> dict:
+    return request.app.state.tile_cache.stats()
+
+
+@router.get("/nearest-edge", summary="좌표에서 가장 가까운 보행·수직 엣지 (시설 제보 위치 매핑)")
+def nearest_edge(request: Request, lat: float = Query(..., ge=-90, le=90), lng: float = Query(..., ge=-180, le=180),
+                 max_distance_m: float = Query(60.0, ge=1, le=500)) -> dict:
+    found = tiles.nearest_edge(request.app.state.store, lat, lng, max_distance_m)
+    if found is None:
+        raise HTTPException(status_code=422, detail=f"반경 {max_distance_m:.0f}m 안에 보행 엣지가 없습니다")
+    return found
+
+
+@router.get("/stats", summary="그래프 데이터 품질 통계")
+def graph_quality(request: Request) -> dict:
+    return store_stats(request.app.state.store)
 
 
 @router.get("/shade", summary="화면 범위의 보행 엣지 그늘 비율 (시각 기준)")

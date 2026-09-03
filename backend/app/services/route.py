@@ -4,7 +4,7 @@ from __future__ import annotations
 import random
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..config import Settings
-from ..models import EngineRun, PolicyUpdate, RouteChoice, RouteRequest, RouteResult, User, UserPolicy
+from ..models import EdgeOverride, EngineRun, PolicyUpdate, RouteChoice, RouteRequest, RouteResult, User, UserPolicy
+from ..observability import ENGINE_LATENCY, ROUTE_CHOICES, ROUTE_SEARCHES, SEARCH_CACHE
 from ..schemas import ChooseResponse, NamedPoint, RouteSearchRequest, RouteSearchResponse, StoredRouteResponse
 from . import engine_client
+from .cache import SearchCache, search_key
 from .personalization import Policy, rerank, update
 from .weather import get_weather
 
@@ -38,8 +40,22 @@ async def save_policy(db: AsyncSession, user_id: uuid.UUID, policy: Policy, row:
     row.updates = policy.updates
 
 
+async def active_overrides(db: AsyncSession) -> list[dict]:
+    """활성이고 만료되지 않은 엣지 오버라이드 (엔진에 그대로 전달)."""
+    now = datetime.now(timezone.utc)
+    rows = (await db.execute(select(EdgeOverride.edge_id, EdgeOverride.kind, EdgeOverride.expires_at).where(EdgeOverride.active.is_(True)))).all()
+    out = []
+    for edge_id, kind, expires_at in rows:
+        if expires_at is not None:
+            exp = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+            if exp < now:
+                continue
+        out.append({"edge_id": int(edge_id), "kind": kind})
+    return out
+
+
 async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequest, user: User | None = None,
-                           rng: random.Random | None = None) -> RouteSearchResponse:
+                           rng: random.Random | None = None, cache: SearchCache | None = None) -> RouteSearchResponse:
     started = time.perf_counter()
     mid_lat = (req.origin.lat + req.destination.lat) / 2
     mid_lng = (req.origin.lng + req.destination.lng) / 2
@@ -53,6 +69,7 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
         "weather": weather.to_engine(),
         "preferences": {"avoid_slope": True, "prefer_shade": req.prefer_shade},
         "options": {"k": req.options.k, "time_budget_s": req.options.time_budget_s, "seed": req.options.seed},
+        "overrides": await active_overrides(db),
     }
     record = RouteRequest(
         user_id=(user.id if user else None),
@@ -61,15 +78,30 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
         profile=req.profile, departure_at=departure_at, weather_mode="auto",
         weather=weather.model_dump(), options={**req.options.model_dump(), "prefer_shade": req.prefer_shade},
     )
-    try:
-        result = await engine_client.search(cfg, payload)
-    except engine_client.EngineError as exc:
-        record.status = "no_route" if exc.status == 422 else "error"
-        record.error = exc.detail
-        record.elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
-        db.add(record)
-        await db.commit()
-        raise
+    key = search_key((req.origin.lat, req.origin.lng), (req.destination.lat, req.destination.lng), req.profile, req.prefer_shade,
+                     departure_at, weather.flags, req.options.k)
+    cached = False
+    result = cache.get(key) if cache is not None else None
+    if result is not None:
+        cached = True
+        SEARCH_CACHE.labels("hit").inc()
+    else:
+        if cache is not None and cache.enabled:
+            SEARCH_CACHE.labels("miss").inc()
+        engine_started = time.perf_counter()
+        try:
+            result = await engine_client.search(cfg, payload)
+        except engine_client.EngineError as exc:
+            record.status = "no_route" if exc.status == 422 else "error"
+            record.error = exc.detail
+            record.elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
+            db.add(record)
+            await db.commit()
+            ROUTE_SEARCHES.labels(req.profile, record.status, "false").inc()
+            raise
+        ENGINE_LATENCY.observe(time.perf_counter() - engine_started)
+        if cache is not None:
+            cache.put(key, result)
     routes = list(result.get("routes", []))
     personalized = False
     if user is not None and cfg.personalization_enabled and len(routes) >= 2:
@@ -92,13 +124,15 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
             generalized_cost_s=(r.get("features") or {}).get("generalized_cost_s"), payload=r,
         ))
     db.add(record)
-    run = _engine_run(record, result.get("metadata") or {}, len(routes), req.options.k)
+    run = None if cached else _engine_run(record, result.get("metadata") or {}, len(routes), req.options.k)
     if run is not None:
         db.add(run)
     await db.commit()
+    ROUTE_SEARCHES.labels(req.profile, "ok", "true" if cached else "false").inc()
     metadata = dict(result.get("metadata", {}))
     metadata["backend_elapsed_ms"] = record.elapsed_ms
     metadata["personalized"] = personalized
+    metadata["cached"] = cached
     return RouteSearchResponse(request_id=str(record.id), profile=req.profile, departure_at=_iso(departure_at),
                                prefer_shade=req.prefer_shade, weather=weather, routes=routes, metadata=metadata, personalized=personalized)
 
@@ -157,6 +191,7 @@ async def record_choice(cfg: Settings, db: AsyncSession, request_id: uuid.UUID, 
         choice.learned = learned
     db.add(choice)
     await db.commit()
+    ROUTE_CHOICES.labels(str(chosen.rank), "true" if learned else "false").inc()
     return ChooseResponse(recorded=True, learned=learned, updates=updates, summary=summary)
 
 

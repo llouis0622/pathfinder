@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -126,6 +126,7 @@ class ApiAccessLog(Base):
     ip: Mapped[str] = mapped_column(String(64), default="")
     user_agent: Mapped[str] = mapped_column(String(300), default="")
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)               # 인증 이벤트 종류, 오류 메시지 등
+    request_id: Mapped[str] = mapped_column(String(64), default="")               # X-Request-ID (프론트→백엔드→엔진 추적)
 
 
 class EngineRun(Base):
@@ -177,3 +178,41 @@ class PolicyUpdate(Base):
     updates_after: Mapped[int] = mapped_column(Integer, default=0)
     weights_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     weights_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class Report(Base):
+    """사용자 시설 제보 (엘리베이터 고장·계단·턱·통행 불가·데이터 정정)."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    request_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("route_requests.id", ondelete="SET NULL"), nullable=True)
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+    kind: Mapped[str] = mapped_column(String(24), index=True)          # elevator_broken | stairs | kerb | blocked | ok | other
+    note: Mapped[str] = mapped_column(Text, default="")
+    place_name: Mapped[str] = mapped_column(String(200), default="")
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)   # open | accepted | rejected
+    edge_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    edge_kind: Mapped[str] = mapped_column(String(16), default="")
+    admin_note: Mapped[str] = mapped_column(Text, default="")
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ip: Mapped[str] = mapped_column(String(64), default="")
+
+
+class EdgeOverride(Base):
+    """검토를 통과한 제보가 만든 엣지 속성 오버라이드. 활성이면 모든 검색에 전달된다."""
+
+    __tablename__ = "edge_overrides"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    edge_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    report_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("reports.id", ondelete="SET NULL"), nullable=True)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

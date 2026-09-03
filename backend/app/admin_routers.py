@@ -17,8 +17,22 @@ from sqlalchemy.orm import selectinload
 
 from . import admin, audit
 from .config import Settings
-from .models import ApiAccessLog, EngineRun, PlaceSearch, PolicyUpdate, RouteChoice, RouteRequest, RouteResult, User, UserPolicy
+from .models import (
+    ApiAccessLog,
+    EdgeOverride,
+    EngineRun,
+    PlaceSearch,
+    PolicyUpdate,
+    Report,
+    RouteChoice,
+    RouteRequest,
+    RouteResult,
+    User,
+    UserPolicy,
+)
+from .reports import KIND_LABELS, report_out
 from .services import admin_stats as stats
+from .services import engine_client
 from .services.maintenance import log_counts, prune_logs
 from .services.personalization import Policy
 
@@ -363,6 +377,152 @@ async def maintenance_prune(body: PruneBody, request: Request, cfg: Settings = D
 @guarded.get("/analytics/ips", summary="개인화 오프라인 평가 (IPS / SNIPS)")
 async def analytics_ips(days: int = Query(30, ge=1, le=365), cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
     return await stats.ips(db, days, cfg.personalization_epsilon)
+
+
+# ---------------------------------------------------------------- 시설 제보 검토·오버라이드
+OVERRIDE_KINDS = ("elevator_broken", "stairs", "kerb", "blocked", "ok")
+
+
+def override_out(o: EdgeOverride) -> dict:
+    return {"id": str(o.id), "created_at": stats.iso(o.created_at), "edge_id": o.edge_id, "kind": o.kind, "kind_label": KIND_LABELS.get(o.kind, o.kind),
+            "active": o.active, "expires_at": stats.iso(o.expires_at), "note": o.note, "report_id": (str(o.report_id) if o.report_id else None),
+            "deactivated_at": stats.iso(o.deactivated_at)}
+
+
+def _clear_search_cache(request: Request) -> None:
+    cache = getattr(request.app.state, "search_cache", None)
+    if cache is not None:
+        cache.clear()
+
+
+@guarded.get("/reports", summary="시설 제보 목록")
+async def admin_reports(pg: Page = Depends(page_params), status: str | None = Query(None), kind: str | None = Query(None),
+                        db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(Report).order_by(Report.created_at.desc())
+    if status:
+        stmt = stmt.where(Report.status == status)
+    if kind:
+        stmt = stmt.where(Report.kind == kind)
+    rows, total = await paginate(db, stmt, pg)
+    reports = [r[0] for r in rows]
+    users = await stats.users_by_id(db, {r.user_id for r in reports if r.user_id})
+    items = [{**report_out(r), "user": stats.user_out(users.get(r.user_id))} for r in reports]
+    counts = (await db.execute(select(Report.status, func.count(Report.id)).group_by(Report.status))).all()
+    return {**envelope(items, total, pg), "counts": {s: int(n) for s, n in counts}, "kinds": KIND_LABELS}
+
+
+class AcceptBody(BaseModel):
+    edge_id: int | None = Field(default=None, description="비우면 제보 좌표에서 가장 가까운 엣지를 엔진에 묻는다")
+    kind: str | None = Field(default=None, description="비우면 제보 종류 그대로 (other 는 반드시 지정)")
+    expires_days: int | None = Field(default=None, ge=1, le=3650)
+    note: str = Field(default="", max_length=500)
+
+
+@guarded.post("/reports/{report_id}/accept", summary="제보 승인 → 엣지 오버라이드 생성 (검색에 즉시 반영)")
+async def accept_report(report_id: str, body: AcceptBody, request: Request, cfg: Settings = Depends(get_settings),
+                        db: AsyncSession = Depends(get_db)) -> dict:
+    r = await db.get(Report, _uuid(report_id))
+    if r is None:
+        raise HTTPException(status_code=404, detail="제보를 찾을 수 없습니다")
+    kind = body.kind or r.kind
+    if kind not in OVERRIDE_KINDS:
+        raise HTTPException(status_code=422, detail="오버라이드 종류를 지정하세요 (elevator_broken·stairs·kerb·blocked·ok)")
+    edge_id = body.edge_id
+    edge_kind = ""
+    if edge_id is None:
+        try:
+            near = await engine_client.nearest_edge(cfg, r.lat, r.lng)
+        except engine_client.EngineError as exc:
+            raise HTTPException(status_code=exc.status if exc.status in (422, 503) else 502, detail=exc.detail) from exc
+        edge_id = int(near["edge_id"])
+        edge_kind = str(near.get("kind", ""))
+    now = datetime.now(timezone.utc)
+    ov = EdgeOverride(edge_id=edge_id, kind=kind, active=True, note=body.note, report_id=r.id,
+                      expires_at=(now + timedelta(days=body.expires_days) if body.expires_days else None))
+    db.add(ov)
+    r.status = "accepted"
+    r.edge_id = edge_id
+    r.edge_kind = edge_kind
+    r.admin_note = body.note
+    r.resolved_at = now
+    await db.commit()
+    await db.refresh(ov)
+    _clear_search_cache(request)
+    audit.mark(request, "admin", f"report_accept:{r.id}:{kind}:{edge_id}")
+    return {"report": report_out(r), "override": override_out(ov)}
+
+
+class RejectBody(BaseModel):
+    note: str = Field(default="", max_length=500)
+
+
+@guarded.post("/reports/{report_id}/reject", summary="제보 거절")
+async def reject_report(report_id: str, body: RejectBody, request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    r = await db.get(Report, _uuid(report_id))
+    if r is None:
+        raise HTTPException(status_code=404, detail="제보를 찾을 수 없습니다")
+    r.status = "rejected"
+    r.admin_note = body.note
+    r.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+    audit.mark(request, "admin", f"report_reject:{r.id}")
+    return report_out(r)
+
+
+@guarded.get("/overrides", summary="엣지 오버라이드 목록")
+async def admin_overrides(pg: Page = Depends(page_params), active: bool | None = Query(None), db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(EdgeOverride).order_by(EdgeOverride.created_at.desc())
+    if active is not None:
+        stmt = stmt.where(EdgeOverride.active == active)
+    rows, total = await paginate(db, stmt, pg)
+    return envelope([override_out(o[0]) for o in rows], total, pg)
+
+
+class OverrideBody(BaseModel):
+    edge_id: int
+    kind: str
+    expires_days: int | None = Field(default=None, ge=1, le=3650)
+    note: str = Field(default="", max_length=500)
+
+
+@guarded.post("/overrides", summary="오버라이드 직접 추가 (제보 없이)")
+async def create_override(body: OverrideBody, request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    if body.kind not in OVERRIDE_KINDS:
+        raise HTTPException(status_code=422, detail="종류는 elevator_broken·stairs·kerb·blocked·ok 중 하나")
+    now = datetime.now(timezone.utc)
+    ov = EdgeOverride(edge_id=body.edge_id, kind=body.kind, active=True, note=body.note,
+                      expires_at=(now + timedelta(days=body.expires_days) if body.expires_days else None))
+    db.add(ov)
+    await db.commit()
+    await db.refresh(ov)
+    _clear_search_cache(request)
+    audit.mark(request, "admin", f"override_add:{body.kind}:{body.edge_id}")
+    return override_out(ov)
+
+
+@guarded.delete("/overrides/{override_id}", summary="오버라이드 해제")
+async def deactivate_override(override_id: str, request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    ov = await db.get(EdgeOverride, _uuid(override_id))
+    if ov is None:
+        raise HTTPException(status_code=404, detail="오버라이드를 찾을 수 없습니다")
+    ov.active = False
+    ov.deactivated_at = datetime.now(timezone.utc)
+    await db.commit()
+    _clear_search_cache(request)
+    audit.mark(request, "admin", f"override_off:{ov.id}")
+    return override_out(ov)
+
+
+@guarded.get("/data-quality", summary="데이터 품질: 엔진 그래프 통계 + 제보·오버라이드·캐시 상태")
+async def data_quality(request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    try:
+        graph = await engine_client.graph_stats(cfg)
+    except engine_client.EngineError as exc:
+        graph = {"error": exc.detail}
+    report_counts = {s: int(n) for s, n in (await db.execute(select(Report.status, func.count(Report.id)).group_by(Report.status))).all()}
+    active = int((await db.execute(select(func.count(EdgeOverride.id)).where(EdgeOverride.active.is_(True)))).scalar_one() or 0)
+    cache = getattr(request.app.state, "search_cache", None)
+    return {"graph": graph, "reports": report_counts, "active_overrides": active, "search_cache": (cache.stats() if cache else None)}
 
 
 # ---------------------------------------------------------------- CSV 내보내기

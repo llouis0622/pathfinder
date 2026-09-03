@@ -66,7 +66,7 @@ async def _write(request: Request, status: int, duration_ms: float) -> None:
         user_id = auth.read_session(cfg, request.cookies.get(auth.SESSION_COOKIE))
     row = ApiAccessLog(kind=kind, method=request.method[:8], path=request.url.path[:200], status=int(status), duration_ms=duration_ms,
                        user_id=user_id, ip=client_ip(request), user_agent=(request.headers.get("user-agent") or "")[:300],
-                       detail=(detail[:2000] if detail else None))
+                       detail=(detail[:2000] if detail else None), request_id=str(getattr(request.state, "request_id", ""))[:64])
     async for db in request.app.state.db.session():
         db.add(row)
         await db.commit()

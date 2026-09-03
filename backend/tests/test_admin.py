@@ -18,7 +18,7 @@ def admin_client(external):
     admin.reset_failures()
     cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", allow_dev_login=True,
                    personalization_epsilon=0.0, jwt_secret="test-secret", admin_password="secret-pw", admin_login_max_failures=3,
-                   admin_login_lockout_s=60)
+                   admin_login_lockout_s=60, search_cache_ttl_s=0)
     with TestClient(create_app(cfg)) as c:
         yield c
 

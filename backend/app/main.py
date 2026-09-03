@@ -7,13 +7,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import audit
+from . import audit, observability
 from .admin_routers import guarded as admin_guarded
 from .admin_routers import router as admin_router
 from .config import Settings, settings
 from .database import Database
+from .reports import router as reports_router
 from .routers import router
 from .services import engine_client
+from .services.cache import SearchCache
 from .services.maintenance import start_retention
 
 log = logging.getLogger("backend")
@@ -21,12 +23,13 @@ log = logging.getLogger("backend")
 
 def create_app(config: Settings | None = None) -> FastAPI:
     cfg = config or settings
-    logging.basicConfig(level=cfg.log_level.upper())
+    observability.configure_logging(cfg.log_level, cfg.log_format)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = cfg
         app.state.db = Database(cfg.database_url)
+        app.state.search_cache = SearchCache(cfg.search_cache_ttl_s, cfg.search_cache_size)
         await app.state.db.create_all()
         log.info("DB 준비 (%s)", cfg.database_url.split("@")[-1])
         retention = start_retention(app)
@@ -40,12 +43,15 @@ def create_app(config: Settings | None = None) -> FastAPI:
     app.include_router(router)
     app.include_router(admin_router)
     app.include_router(admin_guarded)
+    app.include_router(reports_router)
     audit.install(app)
+    observability.install(app, cfg.metrics_enabled)   # 가장 바깥: 요청 ID 를 먼저 만들고 접근 로그가 쓴다
 
     @app.get("/health", summary="헬스체크 (엔진 상태 포함)")
     async def health(request: Request):
         engine = await engine_client.health(request.app.state.settings)
-        return {"status": "ok", "service": "backend", "engine": engine}
+        observability.ENGINE_UP.set(1 if engine.get("status") == "ok" else 0)
+        return {"status": "ok", "service": "backend", "engine": engine, "request_id": getattr(request.state, "request_id", "")}
 
     return app
 
