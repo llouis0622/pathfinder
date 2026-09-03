@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # ---- 개인화 (RL) ----
     personalization_enabled: bool = True
     personalization_epsilon: float = 0.1
+    # ---- 관리자 ----
+    admin_password: str = ""                              # 비어 있으면 관리자 기능 비활성 (/api/admin/* 404)
+    admin_session_hours: int = 12
+    admin_login_max_failures: int = 5                     # 이 횟수 실패하면 잠금
+    admin_login_lockout_s: int = 300
+    access_log_enabled: bool = True                       # 모든 /api 호출을 api_access_logs 에 기록
 
     @property
     def cors_origin_list(self) -> list[str]:

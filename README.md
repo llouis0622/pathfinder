@@ -11,6 +11,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/ALGORITHMS.md](docs/ALGORITHMS.md) | 회랑 추출, ACO, GA, 다양성 Top 3, 배지 |
 | [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md) | OSM·DEM·지하철·버스·건물 빌드와 PostGIS 스키마 |
 | [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md) | 카카오·네이버 로그인과 RL(컨텍스트 밴딧) 개인화 재정렬 |
+| [docs/ADMIN.md](docs/ADMIN.md) | 관리자 페이지: 로그·사용자·취향·분석 대시보드, 접근 로그, CSV 내보내기 |
 
 ## 진행 상태
 

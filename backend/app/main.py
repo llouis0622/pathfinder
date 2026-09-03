@@ -7,6 +7,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import audit
+from .admin_routers import guarded as admin_guarded
+from .admin_routers import router as admin_router
 from .config import Settings, settings
 from .database import Database
 from .routers import router
@@ -28,9 +31,12 @@ def create_app(config: Settings | None = None) -> FastAPI:
         yield
         await app.state.db.dispose()
 
-    app = FastAPI(title="Pathfinder Backend", description="교통약자 맞춤형 경로 추천 서비스 백엔드 API", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="Pathfinder Backend", description="교통약자 맞춤형 경로 추천 서비스 백엔드 API", version="0.4.0", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=cfg.cors_origin_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     app.include_router(router)
+    app.include_router(admin_router)
+    app.include_router(admin_guarded)
+    audit.install(app)
 
     @app.get("/health", summary="헬스체크 (엔진 상태 포함)")
     async def health(request: Request):
