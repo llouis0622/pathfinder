@@ -1,0 +1,10 @@
+-r requirements.txt
+pyrosm==0.6.2
+osmnx==2.0.1
+geopandas==1.0.1
+pyproj==3.7.0
+rasterio==1.4.3
+pandas==2.2.3
+pyarrow==18.1.0
+httpx==0.28.1
+tqdm==4.67.1
