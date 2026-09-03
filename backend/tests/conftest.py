@@ -47,6 +47,20 @@ class FakeExternal:
             return httpx.Response(200, json=[{"id": "wheelchair", "label": "휠체어 이용자", "description": "d", "speed_mps": 1.0}])
         if host in ("engine", "localhost", "127.0.0.1") and path == "/health":
             return httpx.Response(200, json={"status": "ok"})
+        if host in ("engine", "localhost", "127.0.0.1") and path == "/api/tiles/meta":
+            return httpx.Response(200, json={"minzoom": 14, "extent": 4096, "layers": {"edges": "e"}})
+        if host in ("engine", "localhost", "127.0.0.1") and path.startswith("/api/tiles/"):
+            z = int(path.split("/")[3])
+            if z < 14:
+                return httpx.Response(204)
+            if z > 22:
+                return httpx.Response(404, json={"detail": "bad"})
+            return httpx.Response(200, content=b"\x1a\x05tile", headers={"content-type": "application/vnd.mapbox-vector-tile"})
+        if host in ("engine", "localhost", "127.0.0.1") and path == "/api/shade":
+            q = request.url.params
+            if float(q["max_lat"]) - float(q["min_lat"]) > 0.05:
+                return httpx.Response(422, json={"detail": "지도를 더 확대하세요"})
+            return httpx.Response(200, json={"status": "computed", "ratios": {"1": 0.5, "2": 0.0}, "at": q.get("at")})
         if host == "kauth.kakao.com" and path == "/oauth/token":
             return httpx.Response(200, json={"access_token": "kakao-token", "token_type": "bearer"})
         if host == "kapi.kakao.com" and path == "/v2/user/me":

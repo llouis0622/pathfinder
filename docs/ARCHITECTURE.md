@@ -9,7 +9,7 @@
 ┌──────────────┐   /api/route     ┌──────────────┐  /api/search   ┌──────────────┐
 │  frontend    │ ───────────────▶ │  backend     │ ─────────────▶ │  engine      │
 │  React+Vite  │ ◀─────────────── │  FastAPI     │ ◀───────────── │  FastAPI     │
-│  Kakao Map   │   routes[3]      │  날씨·장소·로그 │   routes[3]    │  ACO/GA 탐색  │
+│ MapLibre 지도 │   routes[3]      │  날씨·장소·로그 │   routes[3]    │  ACO/GA 탐색  │
 └──────────────┘                  └──────┬───────┘                └──────┬───────┘
                                          │                               │ corridor SQL
                                          ▼                               ▼
@@ -33,7 +33,7 @@
 
 | 서비스 | 역할 | 포트 |
 |---|---|---|
-| `frontend/` | Kakao 지도, 프로필·조건 입력, Top 3 경로 카드 | 5173 |
+| `frontend/` | MapLibre 지도(VWorld/OSM + 그래프 벡터 타일), 프로필·조건 입력, Top 3 경로 카드 | 5173 |
 | `backend/` | 장소 검색(Kakao Local), 날씨(Open-Meteo 기본 / OpenWeather 선택), 경로 오케스트레이션, 요청·결과 로그 | 8000 |
 | `engine/` | 회랑(corridor) 서브그래프 추출 → 비용 모델 → ACO/GA → 다양성 선택 → 경로 특성·배지 | 8001 |
 | `db` | PostGIS. 그래프 저장 + 서비스 로그 | 5432 |

@@ -52,6 +52,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .sheet__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 20px; display: flex; flex-direction: column; gap: 12px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .brand { font-weight: 800; font-size: 15px; letter-spacing: -0.02em; color: var(--g900); }
+.map-pin { transform: translateY(-6px); background: var(--white); color: var(--g900); font-weight: 700; font-size: 12px; padding: 5px 9px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,.18); white-space: nowrap; border: 1.5px solid var(--g900); }
+.map-pin--dark { background: var(--g900); color: var(--white); }
+.map__hint { position: absolute; left: 50%; transform: translateX(-50%); top: 70px; background: rgba(25,31,40,.86); color: var(--white); font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 7px 12px; z-index: 4; pointer-events: none; }
+.map__locate { position: absolute; left: 50%; transform: translateX(-50%); bottom: 24px; background: var(--g900); color: var(--white); border: 0; border-radius: 999px; padding: 11px 16px; font-weight: 700; font-size: 14px; box-shadow: var(--shadow); z-index: 4; }
+.maplibregl-ctrl-group { border-radius: 12px !important; box-shadow: var(--shadow) !important; }
+.maplibregl-ctrl-bottom-right { bottom: 18px; right: 12px; }
+.maplibregl-ctrl-attrib { font-size: 10px; }
 .map__tools { position: absolute; right: 16px; top: 16px; display: flex; background: var(--white); border-radius: 999px; padding: 4px; box-shadow: var(--shadow); z-index: 4; }
 .map__tool { border: 0; background: transparent; border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--g600); }
 .map__tool.is-on { background: var(--g900); color: var(--white); }
@@ -204,7 +211,18 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .sheet__handle span { display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--g300); margin: 0 auto; }
   .sheet__scroll { padding: 4px 14px 22px; }
   .map__tools { top: auto; bottom: calc(50dvh + 12px); right: 12px; }
-  .app--sheet-closed .map__tools { bottom: 124px; }
-  .app--detail .map__tools { display: none; }
+  .map__hint { top: auto; bottom: calc(50dvh + 64px); }
+  .map__locate { bottom: calc(50dvh + 64px); }
+  .maplibregl-ctrl-bottom-right { bottom: calc(50dvh + 12px); }
+  /* 폰에서는 핀치 줌이 자연스러우니 +/- 버튼은 숨기고 현재 위치 버튼만 둔다 */
+  .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out { display: none !important; }
+  .maplibregl-ctrl-bottom-right { right: auto; left: 12px; }
+  .app--search .map__tools, .app--search .map__locate { bottom: 24px; }
+  .app--search .map__hint { bottom: 80px; }
+  .app--search .maplibregl-ctrl-bottom-right { bottom: 24px; }
+  .app--sheet-closed .map__tools, .app--sheet-closed .map__locate { bottom: 124px; }
+  .app--sheet-closed .map__hint { bottom: 180px; }
+  .app--sheet-closed .maplibregl-ctrl-bottom-right { bottom: 124px; }
+  .app--detail .map__tools, .app--detail .map__hint { display: none; }
   .toast { bottom: calc(50dvh + 12px); }
 }

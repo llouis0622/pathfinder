@@ -17,7 +17,8 @@ from .models import ApiAccessLog
 
 log = logging.getLogger("backend.audit")
 
-SKIP_PREFIXES = ("/health", "/docs", "/openapi.json", "/redoc")
+# 타일·그늘은 지도를 움직일 때마다 호출되므로 접근 로그에서 뺀다
+SKIP_PREFIXES = ("/health", "/docs", "/openapi.json", "/redoc", "/api/tiles", "/api/shade")
 
 
 def mark(request: Request, kind: str, detail: str, user_id: uuid.UUID | None = None) -> None:

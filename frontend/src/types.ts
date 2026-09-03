@@ -160,4 +160,6 @@ export type Preferences = { updates: number; weights: Record<string, number>; su
 /** 지도 위를 덮는 UI(검색 패널·바텀시트) 두께. 경로를 맞출 때 이만큼 비워 둔다. */
 export type MapInset = { top: number; right: number; bottom: number; left: number }
 
-export type MapOverlay = 'mode' | 'grade' | 'shade'
+export type MapOverlay = 'mode' | 'grade' | 'shade' | 'facility'
+
+export type ShadeResponse = { status: string; evaluated_at?: string | null; ratios: Record<string, number>; note?: string }
