@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,8 @@ from ..schemas import NamedPoint, RouteSearchRequest, RouteSearchResponse, Store
 from . import engine_client
 from .weather import get_weather
 
+KST = ZoneInfo("Asia/Seoul")
+
 
 def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
@@ -24,20 +27,22 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
     started = time.perf_counter()
     mid_lat = (req.origin.lat + req.destination.lat) / 2
     mid_lng = (req.origin.lng + req.destination.lng) / 2
-    weather = await get_weather(cfg, mid_lat, mid_lng, req.departure_at, req.weather_mode, req.manual_weather)
+    departure_at = req.departure_at or datetime.now(KST)
+    weather = await get_weather(cfg, mid_lat, mid_lng, departure_at)
     payload = {
         "origin": {"lat": req.origin.lat, "lng": req.origin.lng},
         "destination": {"lat": req.destination.lat, "lng": req.destination.lng},
         "profile": req.profile,
-        "departure_at": _iso(req.departure_at),
+        "departure_at": _iso(departure_at),
         "weather": weather.to_engine(),
+        "preferences": {"avoid_slope": True, "prefer_shade": req.prefer_shade},
         "options": {"k": req.options.k, "time_budget_s": req.options.time_budget_s, "seed": req.options.seed},
     }
     record = RouteRequest(
         origin_lat=req.origin.lat, origin_lng=req.origin.lng, origin_name=req.origin.name[:200],
         dest_lat=req.destination.lat, dest_lng=req.destination.lng, dest_name=req.destination.name[:200],
-        profile=req.profile, departure_at=req.departure_at, weather_mode=req.weather_mode,
-        weather=weather.model_dump(), options=req.options.model_dump(),
+        profile=req.profile, departure_at=departure_at, weather_mode="auto",
+        weather=weather.model_dump(), options={**req.options.model_dump(), "prefer_shade": req.prefer_shade},
     )
     try:
         result = await engine_client.search(cfg, payload)
@@ -61,8 +66,8 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
     await db.commit()
     metadata = dict(result.get("metadata", {}))
     metadata["backend_elapsed_ms"] = record.elapsed_ms
-    return RouteSearchResponse(request_id=str(record.id), profile=req.profile, departure_at=_iso(req.departure_at),
-                               weather=weather, routes=result.get("routes", []), metadata=metadata)
+    return RouteSearchResponse(request_id=str(record.id), profile=req.profile, departure_at=_iso(departure_at),
+                               prefer_shade=req.prefer_shade, weather=weather, routes=result.get("routes", []), metadata=metadata)
 
 
 async def get_stored(db: AsyncSession, request_id: uuid.UUID) -> StoredRouteResponse | None:

@@ -52,7 +52,7 @@ async def place_search(query: str = Query(..., min_length=1, max_length=100), la
 @router.get("/weather", response_model=WeatherOut, summary="날씨 컨텍스트 (현재 또는 출발 시각 예보)")
 async def weather(lat: float = Query(..., ge=-90, le=90), lng: float = Query(..., ge=-180, le=180), at: datetime | None = Query(None),
                   cfg: Settings = Depends(get_settings)) -> WeatherOut:
-    return await get_weather(cfg, lat, lng, at, "auto")
+    return await get_weather(cfg, lat, lng, at)
 
 
 @router.post("/route", response_model=RouteSearchResponse, summary="교통약자 맞춤 경로 Top 3")

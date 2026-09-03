@@ -26,6 +26,9 @@ class ProfileParams:
     slope_soft_pct: float
     slope_hard_pct: float | None          # 초과 시 차단(None이면 차단 없음)
     steep_extra_s_per_m: float = 1.5
+    # 선호(preferences) 가중: avoid_slope 시 비용 ×(1 + slope_avoid_gain × 최대경사%), prefer_shade 시 ×(1 + shade_prefer_gain × (1-그늘))
+    slope_avoid_gain: float = 0.10
+    shade_prefer_gain: float = 0.6
     # 계단
     stairs_blocked_without_ramp: bool = False
     stairs_base_s: float = 0.0
@@ -73,7 +76,7 @@ class ProfileParams:
 PROFILES: dict[str, ProfileParams] = {
     "wheelchair": ProfileParams(
         id="wheelchair", label="휠체어 이용자", speed_mps=1.0,
-        slope_up=0.25, slope_down=0.10, slope_soft_pct=6.0, slope_hard_pct=10.0,
+        slope_up=0.25, slope_down=0.10, slope_soft_pct=5.0, slope_hard_pct=10.0, slope_avoid_gain=0.14,
         stairs_blocked_without_ramp=True,
         surface_factor={"paved": 1.0, "cobble": 1.6, "gravel": 1.5, "rough": 1.8, "": 1.0},
         min_width_m=0.9, narrow_width_m=1.2, narrow_extra_s_per_m=0.5,
@@ -87,7 +90,7 @@ PROFILES: dict[str, ProfileParams] = {
     ),
     "elderly": ProfileParams(
         id="elderly", label="고령자", speed_mps=0.85,
-        slope_up=0.12, slope_down=0.05, slope_soft_pct=8.0, slope_hard_pct=None,
+        slope_up=0.12, slope_down=0.05, slope_soft_pct=6.0, slope_hard_pct=None, slope_avoid_gain=0.10,
         stairs_base_s=25.0, stairs_per_step_s=3.0,
         surface_factor={"paved": 1.0, "cobble": 1.15, "gravel": 1.15, "rough": 1.2, "": 1.0},
         kerb_raised_s=10.0,
@@ -97,7 +100,7 @@ PROFILES: dict[str, ProfileParams] = {
     ),
     "walking_aid": ProfileParams(
         id="walking_aid", label="보행보조기·목발 이용자", speed_mps=0.7,
-        slope_up=0.15, slope_down=0.10, slope_soft_pct=8.0, slope_hard_pct=None,
+        slope_up=0.15, slope_down=0.10, slope_soft_pct=6.0, slope_hard_pct=None, slope_avoid_gain=0.12,
         stairs_base_s=45.0, stairs_per_step_s=5.0,
         surface_factor={"paved": 1.0, "cobble": 1.4, "gravel": 1.3, "rough": 1.5, "": 1.0},
         kerb_raised_s=20.0,
@@ -107,7 +110,7 @@ PROFILES: dict[str, ProfileParams] = {
     ),
     "visually_impaired": ProfileParams(
         id="visually_impaired", label="시각장애인", speed_mps=0.9,
-        slope_up=0.08, slope_down=0.03, slope_soft_pct=10.0, slope_hard_pct=None,
+        slope_up=0.08, slope_down=0.03, slope_soft_pct=8.0, slope_hard_pct=None, slope_avoid_gain=0.06,
         stairs_base_s=20.0, stairs_per_step_s=2.0, stairs_handrail_factor=0.5,
         surface_factor={"paved": 1.0, "cobble": 1.15, "gravel": 1.1, "rough": 1.2, "": 1.0},
         crossing_signals_s=20.0, crossing_marked_s=45.0, crossing_unmarked_s=90.0,

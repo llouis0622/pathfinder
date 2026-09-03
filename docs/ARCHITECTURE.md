@@ -42,8 +42,8 @@
 
 ## 요청 흐름
 
-1. 프론트가 출발·도착 좌표, 프로필, 출발 시각, 날씨 모드(자동/수동)를 백엔드에 보낸다.
-2. 백엔드가 날씨를 조회해 `WeatherContext`(체감온도·강수·풍속·PM10·폭염/한파/우천/대기 나쁨 플래그)를 만든다.
+1. 프론트가 출발·도착 좌표, 프로필, 그늘 우선 여부를 백엔드에 보낸다 (출발 시각은 지금).
+2. 백엔드가 실시간 날씨를 조회해 `WeatherContext`(체감온도·강수·풍속·PM10·폭염/한파/우천/대기 나쁨 플래그)를 만든다.
 3. 백엔드가 엔진 `/api/search`를 호출한다.
 4. 엔진:
    1. 출발·도착을 가장 가까운 보행 노드에 스냅한다.
@@ -66,10 +66,10 @@
 | GET | `/api/profiles` | 프로필 목록 (엔진에서 가져오고, 실패 시 정적 목록) |
 | GET | `/api/place/search?query&lat&lng` | 장소 검색. Kakao Local(키 있을 때) → 로컬 지하철역·버스정류장 색인 |
 | GET | `/api/weather?lat&lng&at` | 날씨 컨텍스트. `at`이 30분 이상 미래면 시간별 예보 |
-| POST | `/api/route` | 경로 Top K. 본문: `origin, destination, profile, departure_at, weather_mode(auto/manual/none), manual_weather, options{k, time_budget_s, seed}` |
+| POST | `/api/route` | 경로 Top K. 본문: `origin, destination, profile, prefer_shade, departure_at(생략 시 지금), options{k, time_budget_s, seed}`. 날씨는 항상 실시간(또는 출발 시각 예보) 반영, 경사 회피는 항상 켬 |
 | GET | `/api/route/{request_id}` | 저장된 요청·결과 조회 |
 
-`POST /api/route` 응답: `request_id, profile, departure_at, weather{source, flags[], …}, routes[](엔진 RouteOut 그대로), metadata`.
+`POST /api/route` 응답: `request_id, profile, departure_at, prefer_shade, weather{source, flags[], …}, routes[](엔진 RouteOut 그대로), metadata`.
 엔진이 422(경로 없음)를 주면 백엔드도 422로 전달하고 요청은 `status=no_route`로 남긴다.
 
 ### engine (`:8001`, 내부)
@@ -99,7 +99,7 @@ pathfinder/
 ├── backend/
 │   ├── app/{main,config,database,models,schemas,routers,http}.py, services/{weather,places,engine_client,route}.py
 │   └── tests/
-├── frontend/src/{api,components,hooks,pages,types}
+├── frontend/src/{api.ts,types.ts,App.tsx,components/,hooks/,lib/,test/}
 ├── data/               # DEM, 지하철 CSV, 버스 정류장 CSV, 경계, 샘플 그래프
 ├── docs/               # 이 문서들
 └── docker-compose.yml

@@ -1,4 +1,4 @@
-"""날씨 조회. 공급자: Open-Meteo(기본, 키 불필요) / OpenWeather / none. 수동 플래그 모드 지원.
+"""실시간 날씨 조회. 공급자: Open-Meteo(기본, 키 불필요) / OpenWeather / none.
 
 출발 시각이 미래(30분 이후)면 시간별 예보에서 해당 시각을 고른다. 실패하면 source="unavailable" 로
 플래그 없는 컨텍스트를 돌려주고, 응답 note 에 사유를 남긴다.
@@ -14,7 +14,7 @@ import httpx
 
 from .. import http
 from ..config import Settings
-from ..schemas import ManualWeather, WeatherOut
+from ..schemas import WeatherOut
 
 log = logging.getLogger("backend.weather")
 KST = ZoneInfo("Asia/Seoul")
@@ -153,21 +153,9 @@ async def _openweather(client: httpx.AsyncClient, lat: float, lng: float, key: s
     return out
 
 
-def manual_weather(flags: ManualWeather | None) -> WeatherOut:
-    active = [f for f in ("heat", "heatwave", "cold", "coldwave", "rain", "bad_air", "windy") if flags and getattr(flags, f)]
-    if "heatwave" in active and "heat" not in active:
-        active.append("heat")
-    if "coldwave" in active and "cold" not in active:
-        active.append("cold")
-    return WeatherOut(source="manual", flags=active, note="사용자가 직접 지정한 날씨 조건")
-
-
-async def get_weather(cfg: Settings, lat: float, lng: float, at: datetime | None = None, mode: str = "auto",
-                      manual: ManualWeather | None = None) -> WeatherOut:
-    if mode == "none" or cfg.weather_provider == "none":
+async def get_weather(cfg: Settings, lat: float, lng: float, at: datetime | None = None) -> WeatherOut:
+    if cfg.weather_provider == "none":
         return WeatherOut(source="none", note="날씨를 반영하지 않습니다")
-    if mode == "manual":
-        return manual_weather(manual)
     target = _target_hour(at)
     cache_key = (cfg.weather_provider, round(lat, 2), round(lng, 2), target.isoformat() if target else None)
     now = time.monotonic()

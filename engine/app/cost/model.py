@@ -60,8 +60,15 @@ def compute_costs(
     profile: ProfileParams,
     weather: WeatherContext | None = None,
     shade_ratio: np.ndarray | None = None,
+    *,
+    avoid_slope: bool = True,
+    prefer_shade: bool = False,
+    shade_available: bool | None = None,
 ) -> CostResult:
+    """avoid_slope: 경사 비례 비용 가중(기본 켬). prefer_shade: 그늘 없는 실외 보행 가중(그늘 계산이 된 경우만)."""
     weather = weather or WeatherContext.none()
+    if shade_available is None:
+        shade_available = shade_ratio is not None and bool(np.any(np.nan_to_num(shade_ratio) > 0))
     E = graph.num_edges
     e = graph.edges
     kind = e["kind"]
@@ -89,6 +96,9 @@ def compute_costs(
         sf = _surface_factor(profile, e["surface"])
         t = t * sf
         c = t.copy()
+        # 경사 회피: 완만한 길 우선 (모든 보행 엣지, 최대 경사 비례)
+        if avoid_slope and profile.slope_avoid_gain > 0:
+            c = c * (1.0 + profile.slope_avoid_gain * g_max)
         # 급경사 추가 부담
         steep = g_max > profile.slope_soft_pct
         c = c + np.where(steep, length * profile.steep_extra_s_per_m * rain_mult, 0.0)
@@ -152,6 +162,8 @@ def compute_costs(
             wmult = wmult * profile.bad_air_factor
         if weather.windy:
             wmult = wmult * profile.windy_factor
+        if prefer_shade and shade_available:
+            wmult = wmult * (1.0 + profile.shade_prefer_gain * (1.0 - shade))
         c = c * np.where(outdoor, wmult, 1.0)
         time_s[walk] = t[walk]
         cost[walk] = c[walk]

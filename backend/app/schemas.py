@@ -7,23 +7,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 ProfileId = Literal["wheelchair", "elderly", "walking_aid", "visually_impaired"]
-WeatherMode = Literal["auto", "manual", "none"]
 
 
 class NamedPoint(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lng: float = Field(ge=-180, le=180)
     name: str = ""
-
-
-class ManualWeather(BaseModel):
-    heat: bool = False
-    heatwave: bool = False
-    cold: bool = False
-    coldwave: bool = False
-    rain: bool = False
-    bad_air: bool = False
-    windy: bool = False
 
 
 class RouteSearchOptions(BaseModel):
@@ -33,12 +22,13 @@ class RouteSearchOptions(BaseModel):
 
 
 class RouteSearchRequest(BaseModel):
+    """날씨는 항상 실시간(또는 출발 시각 예보)으로 반영한다. 경사 회피는 엔진 기본값이며, 그늘 우선만 선택한다."""
+
     origin: NamedPoint
     destination: NamedPoint
     profile: ProfileId
-    departure_at: datetime | None = None
-    weather_mode: WeatherMode = "auto"
-    manual_weather: ManualWeather | None = None
+    departure_at: datetime | None = Field(default=None, description="없으면 지금 출발")
+    prefer_shade: bool = False
     options: RouteSearchOptions = Field(default_factory=RouteSearchOptions)
 
 
@@ -57,21 +47,17 @@ class WeatherOut(BaseModel):
 
     def to_engine(self) -> dict[str, Any]:
         """엔진 WeatherContext 입력."""
-        payload: dict[str, Any] = {
+        return {
             "source": self.source, "observed_at": self.observed_at, "temp_c": self.temp_c, "feels_like_c": self.feels_like_c,
             "precipitation_mm": self.precipitation_mm, "wind_ms": self.wind_ms, "pm10": self.pm10, "sky": self.sky,
         }
-        if self.source == "manual":
-            payload["flags_explicit"] = True
-            for f in ("heat", "heatwave", "cold", "coldwave", "rain", "bad_air", "windy"):
-                payload[f] = f in self.flags
-        return payload
 
 
 class RouteSearchResponse(BaseModel):
     request_id: str
     profile: str
     departure_at: str | None
+    prefer_shade: bool
     weather: WeatherOut
     routes: list[dict[str, Any]]
     metadata: dict[str, Any]
