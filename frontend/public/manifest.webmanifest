@@ -1,0 +1,16 @@
+{
+  "name": "Pathfinder 교통약자 길찾기",
+  "short_name": "Pathfinder",
+  "description": "휠체어·고령자·보행보조·시각장애인을 위한 부산 경로 안내",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#191f28",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

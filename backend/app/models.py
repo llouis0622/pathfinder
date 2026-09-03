@@ -216,3 +216,19 @@ class EdgeOverride(Base):
     note: Mapped[str] = mapped_column(Text, default="")
     report_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("reports.id", ondelete="SET NULL"), nullable=True)
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class UserPlace(Base):
+    """즐겨찾기 장소 (집·직장 등). 로그인 사용자 전용, 게스트는 브라우저에 저장한다."""
+
+    __tablename__ = "user_places"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    label: Mapped[str] = mapped_column(String(40))                # 집, 직장, 병원 …
+    name: Mapped[str] = mapped_column(String(200))
+    address: Mapped[str] = mapped_column(String(300), default="")
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+    sort: Mapped[int] = mapped_column(Integer, default=0)
