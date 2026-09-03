@@ -82,16 +82,18 @@ def compute_costs(
     walk = (kind == "walk") | (kind == "link")
     if walk.any():
         g_abs = np.abs(grade)
+        g_max = np.nan_to_num(e["max_grade_pct"].astype(np.float64), nan=0.0)
+        g_max = np.maximum(g_max, g_abs)
         a = np.where(grade > 0, profile.slope_up, profile.slope_down)
         t = length / profile.speed_mps * (1.0 + a * g_abs)
         sf = _surface_factor(profile, e["surface"])
         t = t * sf
         c = t.copy()
         # 급경사 추가 부담
-        steep = g_abs > profile.slope_soft_pct
+        steep = g_max > profile.slope_soft_pct
         c = c + np.where(steep, length * profile.steep_extra_s_per_m * rain_mult, 0.0)
         if profile.slope_hard_pct is not None:
-            hard = walk & (g_abs > profile.slope_hard_pct)
+            hard = walk & (g_max > profile.slope_hard_pct)
             blocked[hard] = BLOCK_SLOPE
         # 계단
         stairs = e["stairs"] == TRI_TRUE

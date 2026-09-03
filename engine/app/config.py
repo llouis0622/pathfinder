@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "dev"
-    # postgis | file
+    # file | postgis | postgis_memory
     graph_source: str = "file"
     graph_bundle_path: str = "../data/samples/grid_city.npz"
     buildings_path: str = "../data/samples/grid_city_buildings.json"
