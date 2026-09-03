@@ -13,6 +13,8 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md) | 카카오·네이버 로그인과 RL(컨텍스트 밴딧) 개인화 재정렬 |
 | [docs/ADMIN.md](docs/ADMIN.md) | 관리자 페이지: 로그·사용자·취향·분석 대시보드, 접근 로그, CSV 내보내기 |
 | [docs/MAP.md](docs/MAP.md) | MapLibre 지도: VWorld/OSM 배경, 그래프 벡터 타일, 실시간 그늘, GPS 출발 |
+| [docs/CHECKLIST.md](docs/CHECKLIST.md) | 발급받을 API 키와 확보할 데이터 체크리스트 |
+| [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | 키 발급 절차와 기입 위치를 항목별로 적은 상세 가이드 |
 
 ## 진행 상태
 
