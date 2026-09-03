@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useKakaoMap, type KakaoOverlay } from '../hooks/useKakaoMap'
 import { WALK_COLOR, gradeColor, legColor, shadeColor } from '../lib/format'
-import type { MapOverlay, Place, Route } from '../types'
+import type { MapInset, MapOverlay, Place, Route } from '../types'
 import SchematicMap from './SchematicMap'
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
   routes: Route[]
   selectedId: string | null
   overlay: MapOverlay
+  inset?: MapInset
   onSelect: (id: string) => void
 }
 
@@ -19,7 +20,10 @@ function pinHtml(label: string, dark: boolean): string {
   return `<div style="transform:translateY(-6px);background:${bg};color:${fg};font-weight:700;font-size:12px;padding:5px 9px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18);white-space:nowrap;border:1.5px solid #191f28">${label}</div>`
 }
 
-export default function MapView({ origin, destination, routes, selectedId, overlay, onSelect }: Props) {
+const NO_INSET: MapInset = { top: 0, right: 0, bottom: 0, left: 0 }
+const FIT_PAD = 48
+
+export default function MapView({ origin, destination, routes, selectedId, overlay, inset = NO_INSET, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const { map, status } = useKakaoMap(containerRef)
   const overlaysRef = useRef<KakaoOverlay[]>([])
@@ -70,8 +74,8 @@ export default function MapView({ origin, destination, routes, selectedId, overl
       add(new maps.CustomOverlay({ position: new maps.LatLng(destination.lat, destination.lng), content: pinHtml('도착', true), yAnchor: 1.3, zIndex: 20, map }))
       extend(destination.lat, destination.lng)
     }
-    if (hasBounds) map.setBounds(bounds, 48, 48, 48, 48)
-  }, [map, origin, destination, routes, selectedId, overlay])
+    if (hasBounds) map.setBounds(bounds, FIT_PAD + inset.top, FIT_PAD + inset.right, FIT_PAD + inset.bottom, FIT_PAD + inset.left)
+  }, [map, origin, destination, routes, selectedId, overlay, inset.top, inset.right, inset.bottom, inset.left])
 
   useEffect(() => {
     if (!map) return
@@ -81,7 +85,7 @@ export default function MapView({ origin, destination, routes, selectedId, overl
   }, [map])
 
   if (status === 'no-key' || status === 'error') {
-    return <SchematicMap origin={origin} destination={destination} routes={routes} selectedId={selectedId} overlay={overlay} onSelect={onSelect} />
+    return <SchematicMap origin={origin} destination={destination} routes={routes} selectedId={selectedId} overlay={overlay} inset={inset} onSelect={onSelect} />
   }
   return <div ref={containerRef} className="map-canvas" role="application" aria-label="지도" />
 }

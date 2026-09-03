@@ -89,6 +89,8 @@ export type Badge =
 export type Route = {
   id: string
   rank: number
+  engine_rank?: number
+  personal_score?: number
   summary: string
   badges: Badge[]
   cautions: string[]
@@ -147,6 +149,15 @@ export type RouteSearchResponse = {
   weather: Weather
   routes: Route[]
   metadata: SearchMetadata
+  personalized: boolean
 }
+
+export type User = { id: string; provider: string; nickname: string; avatar_url: string }
+export type AuthProviders = { providers: ('kakao' | 'naver')[]; dev_login: boolean }
+export type ChooseResponse = { recorded: boolean; learned: boolean; updates: number; summary: string[] }
+export type Preferences = { updates: number; weights: Record<string, number>; summary: string[] }
+
+/** 지도 위를 덮는 UI(검색 패널·바텀시트) 두께. 경로를 맞출 때 이만큼 비워 둔다. */
+export type MapInset = { top: number; right: number; bottom: number; left: number }
 
 export type MapOverlay = 'mode' | 'grade' | 'shade'

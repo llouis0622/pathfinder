@@ -1,4 +1,4 @@
-import type { Place, Profile, Route, RouteSearchRequest, RouteSearchResponse, Weather } from './types'
+import type { AuthProviders, ChooseResponse, Place, Preferences, Profile, Route, RouteSearchRequest, RouteSearchResponse, User, Weather } from './types'
 
 // VITE_BACKEND_URL 이 비어 있으면 같은 오리진의 /api 를 쓴다 (vite proxy / nginx).
 const base = (import.meta.env.VITE_BACKEND_URL ?? '').replace(/\/$/, '')
@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${base}${path}`, { headers: { 'content-type': 'application/json' }, ...init })
+  const res = await fetch(`${base}${path}`, { headers: { 'content-type': 'application/json' }, credentials: 'include', ...init })
   if (!res.ok) {
     let detail = res.statusText
     try {
@@ -52,4 +52,38 @@ export function searchRoutes(payload: RouteSearchRequest): Promise<RouteSearchRe
 
 export function fetchStoredRoute(requestId: string): Promise<{ routes: Route[]; status: string }> {
   return request(`/api/route/${encodeURIComponent(requestId)}`)
+}
+
+export function chooseRoute(requestId: string, routeId: string): Promise<ChooseResponse> {
+  return request(`/api/route/${encodeURIComponent(requestId)}/choose`, { method: 'POST', body: JSON.stringify({ route_id: routeId }) })
+}
+
+// ---------- 로그인 ----------
+export function fetchAuthProviders(): Promise<AuthProviders> {
+  return request('/api/auth/providers')
+}
+
+export async function fetchMe(): Promise<User | null> {
+  const res = await request<{ user: User | null }>('/api/auth/me')
+  return res.user
+}
+
+export function loginUrl(provider: 'kakao' | 'naver'): string {
+  return `${base}/api/auth/${provider}/login`
+}
+
+export function devLogin(nickname = '데모 사용자'): Promise<User> {
+  return request(`/api/auth/dev/login?${new URLSearchParams({ nickname }).toString()}`, { method: 'POST' })
+}
+
+export function logout(): Promise<{ ok: boolean }> {
+  return request('/api/auth/logout', { method: 'POST' })
+}
+
+export function fetchPreferences(): Promise<Preferences> {
+  return request('/api/me/preferences')
+}
+
+export function resetPreferences(): Promise<{ ok: boolean }> {
+  return request('/api/me/preferences', { method: 'DELETE' })
 }

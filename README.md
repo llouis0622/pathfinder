@@ -10,6 +10,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/COST_MODEL.md](docs/COST_MODEL.md) | 프로필별·날씨별 엣지 비용 공식 |
 | [docs/ALGORITHMS.md](docs/ALGORITHMS.md) | 회랑 추출, ACO, GA, 다양성 Top 3, 배지 |
 | [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md) | OSM·DEM·지하철·버스·건물 빌드와 PostGIS 스키마 |
+| [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md) | 카카오·네이버 로그인과 RL(컨텍스트 밴딧) 개인화 재정렬 |
 
 ## 진행 상태
 
@@ -59,7 +60,8 @@ cd ../frontend && npm install && npm run typecheck && npm test        # vitest +
   키가 없으면 `SchematicMap.tsx`(SVG 약식 지도)로 자동 대체된다.
 - `src/components/RouteRow.tsx`, `RouteDetail.tsx`: 네이버·카카오 길찾기식 경로 행(소요시간·수단 바·요약·태그)과 세로 타임라인 상세.
 - `src/components/ProfileChips.tsx`: 이용자 유형 4종 칩과 "그늘 우선" 토글. 날씨는 선택 없이 실시간으로 반영되고, 경사 회피는 항상 켜져 있다.
-- 디자인: 화이트·블랙·그레이 톤(토스 스타일), 지하철 노선색만 정보 표시용으로 유지.
+- 디자인: 화이트·블랙·그레이 톤(토스 스타일), 지하철 노선색만 정보 표시용으로 유지. 길찾기 패널은 카카오맵·네이버지도처럼 지도 위 상단에 뜬다.
+- 로그인: 카카오·네이버 OAuth. 로그인 후 "이 경로로 가기"를 누르면 취향이 학습되어 다음 추천 순위에 반영된다 (`ALLOW_DEV_LOGIN=true`면 키 없이 데모 계정으로 체험).
 
 합성 격자 도시(`data/samples/grid_city.npz`)로 엔진 전체를 검증한다. 실제 부산 그래프 빌드는
 [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md)를 따른다.

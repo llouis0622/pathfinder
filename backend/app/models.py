@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -14,11 +14,54 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("provider", "provider_user_id", name="uq_users_provider_uid"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(16))              # kakao | naver | dev
+    provider_user_id: Mapped[str] = mapped_column(String(128))
+    nickname: Mapped[str] = mapped_column(String(100), default="")
+    avatar_url: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class UserPolicy(Base):
+    """사용자별 개인화 정책 (personalization.Policy 직렬화)."""
+
+    __tablename__ = "user_policies"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    policy: Mapped[dict] = mapped_column(JSON, default=dict)
+    updates: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class RouteChoice(Base):
+    """사용자가 실제로 고른 경로 (RL 보상 신호)."""
+
+    __tablename__ = "route_choices"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("route_requests.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    route_id: Mapped[str] = mapped_column(String(32))
+    shown_rank: Mapped[int] = mapped_column(Integer)
+    propensity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    learned: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class RouteRequest(Base):
     __tablename__ = "route_requests"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    personalized: Mapped[bool] = mapped_column(Boolean, default=False)
+    explored: Mapped[bool] = mapped_column(Boolean, default=False)
+    propensities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     origin_lat: Mapped[float] = mapped_column(Float)
     origin_lng: Mapped[float] = mapped_column(Float)
     origin_name: Mapped[str] = mapped_column(String(200), default="")
@@ -51,6 +94,7 @@ class RouteResult(Base):
     walk_distance_m: Mapped[float] = mapped_column(Float)
     transfers: Mapped[int] = mapped_column(Integer, default=0)
     generalized_cost_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    engine_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON)
 
     request: Mapped[RouteRequest] = relationship(back_populates="results")

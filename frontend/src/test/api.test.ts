@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { searchPlaces, searchRoutes } from '../api'
+import { chooseRoute, fetchMe, loginUrl, searchPlaces, searchRoutes } from '../api'
 
 describe('api client', () => {
   afterEach(() => vi.restoreAllMocks())
@@ -13,6 +13,18 @@ describe('api client', () => {
     expect(String(url)).toBe('/api/route')
     expect(init?.method).toBe('POST')
     expect(JSON.parse(String(init?.body))).toMatchObject({ profile: 'elderly', prefer_shade: true })
+  })
+
+  it('records a chosen route and reads a guest /me as null', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ recorded: true, learned: true, updates: 1, summary: ['그늘 많은 길 선호'] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ user: null }), { status: 200 }))
+    const res = await chooseRoute('req-1', 'route_2')
+    expect(res.learned).toBe(true)
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/route/req-1/choose')
+    expect(fetchMock.mock.calls[0][1]?.credentials).toBe('include')
+    expect(await fetchMe()).toBeNull()
+    expect(loginUrl('kakao')).toBe('/api/auth/kakao/login')
   })
 
   it('encodes place queries and surfaces backend detail on errors', async () => {

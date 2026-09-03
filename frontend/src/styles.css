@@ -33,21 +33,59 @@ button:disabled { cursor: not-allowed; }
 h1, h2, h3, p { margin: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 
-/* ---------- 레이아웃 ---------- */
-.app { display: flex; height: 100dvh; background: var(--g100); }
-.panel { width: var(--panel-w); flex: none; min-height: 0; background: var(--white); display: flex; flex-direction: column; z-index: 2; box-shadow: 1px 0 0 var(--g200); }
-.panel__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 20px 32px; display: flex; flex-direction: column; gap: 20px; }
-.map { flex: 1; position: relative; min-width: 0; background: var(--g100); }
+/* ---------- 레이아웃: 지도 전면, 길찾기 패널은 지도 위 (카카오맵·네이버지도) ---------- */
+.app { position: relative; height: 100dvh; background: var(--g100); overflow: hidden; }
+.map { position: absolute; inset: 0; background: var(--g100); }
 .map-canvas { position: absolute; inset: 0; }
 .schematic { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.schematic__svg { width: 100%; height: 100%; display: block; }
 .schematic--empty { display: flex; align-items: center; justify-content: center; }
-.map__tools { position: absolute; right: 16px; top: 16px; display: flex; background: var(--white); border-radius: 999px; padding: 4px; box-shadow: var(--shadow); }
+/* 데스크톱: 검색 패널과 결과 시트를 한 카드에 세로로 */
+.dock {
+  position: absolute; top: 16px; left: 16px; width: var(--panel-w); max-height: calc(100dvh - 32px);
+  background: var(--white); border-radius: 22px; box-shadow: 0 6px 28px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.04);
+  display: flex; flex-direction: column; z-index: 5; overflow: hidden;
+}
+.panel { flex: none; padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+.sheet { flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--g100); }
+.sheet__handle { display: none; }
+.sheet__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
+.brand { font-weight: 800; font-size: 15px; letter-spacing: -0.02em; color: var(--g900); }
+.map__tools { position: absolute; right: 16px; top: 16px; display: flex; background: var(--white); border-radius: 999px; padding: 4px; box-shadow: var(--shadow); z-index: 4; }
 .map__tool { border: 0; background: transparent; border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--g600); }
 .map__tool.is-on { background: var(--g900); color: var(--white); }
+.toast {
+  position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--g900); color: var(--white);
+  padding: 12px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); z-index: 20; white-space: nowrap;
+}
+
+/* ---------- 로그인 메뉴 ---------- */
+.auth { position: relative; }
+.auth__login { border: 0; background: var(--g100); color: var(--g900); border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 700; }
+.auth__login:disabled { opacity: .4; }
+.auth__user { border: 0; background: transparent; display: flex; align-items: center; gap: 8px; padding: 2px 4px 2px 2px; border-radius: 999px; }
+.auth__user:hover { background: var(--g100); }
+.auth__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--g900); color: var(--white); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.auth__name { font-size: 13px; font-weight: 700; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth__menu {
+  position: absolute; right: 0; top: calc(100% + 8px); width: 260px; background: var(--white); border-radius: 16px; padding: 8px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.16); z-index: 30; display: flex; flex-direction: column; gap: 4px;
+}
+.auth__section { padding: 8px 10px 6px; }
+.auth__title { font-size: 13px; font-weight: 700; color: var(--g700); line-height: 1.4; }
+.auth__prefs { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; }
+.auth__prefs li::before { content: '· '; color: var(--g400); }
+.auth__hint { font-size: 12px; color: var(--g500); margin-top: 4px; }
+.auth__item { border: 0; background: var(--g100); border-radius: 10px; padding: 11px 12px; font-size: 14px; font-weight: 700; text-align: left; display: flex; align-items: center; gap: 10px; }
+.auth__item:hover { filter: brightness(.97); }
+.auth__item--kakao { background: #fee500; color: #191f28; }
+.auth__item--naver { background: #03c75a; color: #fff; }
+.auth__item--danger { color: var(--danger); background: transparent; }
+.auth__brand { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 900; background: rgba(0,0,0,.12); }
 
 /* ---------- 검색 헤더 ---------- */
-.head { display: flex; flex-direction: column; gap: 16px; }
-.head__title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; }
+.head { display: flex; flex-direction: column; gap: 12px; }
 .inputs { position: relative; background: var(--g100); border-radius: var(--radius); padding: 6px 52px 6px 8px; }
 .inputs__divider { height: 1px; background: var(--g200); margin: 0 12px 0 36px; }
 .inputs__swap {
@@ -90,12 +128,14 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .cta:active { transform: scale(.985); }
 .cta:disabled { background: var(--g200); color: var(--g400); }
 .cta--ghost { background: var(--g100); color: var(--g900); }
+.cta--done { background: var(--g200); color: var(--g600); }
 .error { color: var(--danger); font-size: 13px; font-weight: 600; }
 
 /* ---------- 결과 목록 ---------- */
 .results { display: flex; flex-direction: column; gap: 12px; }
 .results__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 2px; }
-.results__title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.results__title { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
+.results__tag { background: var(--g100); color: var(--g700); border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
 .results__weather { font-size: 13px; color: var(--g500); font-weight: 600; }
 .rows { display: flex; flex-direction: column; gap: 10px; }
 .row {
@@ -141,13 +181,30 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .tl--ride .tl__line { bottom: 14px; }
 .is-warn { color: var(--warn); font-weight: 700; }
 
-/* ---------- 모바일 ---------- */
+/* ---------- 모바일: 위에는 길찾기만, 아래에는 경로 바텀시트, 지도는 맨 뒤 ---------- */
 @media (max-width: 860px) {
-  .app { flex-direction: column-reverse; }
-  .map { flex: none; height: 42dvh; }
-  .panel { width: 100%; flex: 1 1 0; min-height: 0; border-radius: 22px 22px 0 0; margin-top: -22px; box-shadow: 0 -6px 24px rgba(0,0,0,.08); }
-  .panel__scroll { padding: 18px 16px 28px; }
-  .panel::before { content: ''; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--g300); margin: 10px auto -6px; }
-  .head__title { font-size: 21px; }
-  .map__tools { top: 12px; right: 12px; }
+  .dock { position: static; width: auto; max-height: none; background: transparent; box-shadow: none; border-radius: 0; overflow: visible; display: contents; }
+  .panel {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 6; background: var(--white);
+    border-radius: 0 0 22px 22px; box-shadow: 0 8px 28px rgba(0,0,0,.14); padding: 10px 14px 14px; gap: 10px;
+  }
+  .dock--detail .panel { display: none; }
+  .chips { flex-direction: row; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips__row { flex-wrap: nowrap; flex: none; }
+  .chips .chip { flex: none; }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--white); border-top: 0;
+    border-radius: 22px 22px 0 0; box-shadow: 0 -8px 28px rgba(0,0,0,.14); max-height: 50dvh; transition: max-height .2s ease;
+  }
+  .sheet:not(.is-open) { max-height: 112px; }
+  .sheet:not(.is-open) .sheet__scroll { overflow: hidden; }
+  .dock--detail .sheet { max-height: 88dvh; }
+  .sheet__handle { display: block; border: 0; background: transparent; padding: 10px 0 4px; width: 100%; }
+  .sheet__handle span { display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--g300); margin: 0 auto; }
+  .sheet__scroll { padding: 4px 14px 22px; }
+  .map__tools { top: auto; bottom: calc(50dvh + 12px); right: 12px; }
+  .app--sheet-closed .map__tools { bottom: 124px; }
+  .app--detail .map__tools { display: none; }
+  .toast { bottom: calc(50dvh + 12px); }
 }

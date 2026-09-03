@@ -47,6 +47,15 @@ class FakeExternal:
             return httpx.Response(200, json=[{"id": "wheelchair", "label": "휠체어 이용자", "description": "d", "speed_mps": 1.0}])
         if host in ("engine", "localhost", "127.0.0.1") and path == "/health":
             return httpx.Response(200, json={"status": "ok"})
+        if host == "kauth.kakao.com" and path == "/oauth/token":
+            return httpx.Response(200, json={"access_token": "kakao-token", "token_type": "bearer"})
+        if host == "kapi.kakao.com" and path == "/v2/user/me":
+            assert request.headers.get("authorization") == "Bearer kakao-token"
+            return httpx.Response(200, json={"id": 12345, "kakao_account": {"profile": {"nickname": "카카오사람", "thumbnail_image_url": "http://img/k.png"}}})
+        if host == "nid.naver.com" and path == "/oauth2.0/token":
+            return httpx.Response(200, json={"access_token": "naver-token"})
+        if host == "openapi.naver.com" and path == "/v1/nid/me":
+            return httpx.Response(200, json={"resultcode": "00", "response": {"id": "n-1", "nickname": "네이버사람", "profile_image": ""}})
         if host == "dapi.kakao.com":
             if self.kakao_status != 200:
                 return httpx.Response(self.kakao_status, json={"message": "unauthorized"})
