@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import auth
+from . import audit, auth
 from .config import Settings
 from .models import PlaceSearch, User
 from .schemas import (
@@ -130,7 +130,8 @@ async def auth_me(user: User | None = Depends(get_user)) -> dict:
 
 
 @router.post("/auth/logout", summary="로그아웃")
-async def auth_logout(response: Response, cfg: Settings = Depends(get_settings)) -> dict:
+async def auth_logout(request: Request, response: Response, cfg: Settings = Depends(get_settings), user: User | None = Depends(get_user)) -> dict:
+    audit.mark(request, "auth", "logout", (user.id if user else None))
     response.delete_cookie(auth.SESSION_COOKIE, path="/")
     return {"ok": True}
 
@@ -150,12 +151,14 @@ async def auth_callback(provider: str, request: Request, code: str | None = Quer
     if provider not in auth.PROVIDERS:
         raise HTTPException(status_code=404, detail="지원하지 않는 로그인 공급자입니다")
     if error or not code:
+        audit.mark(request, "auth", f"login_cancelled:{provider}")
         return RedirectResponse(f"{cfg.frontend_url}?login=cancelled", status_code=302)
     expected = request.cookies.get(auth.STATE_COOKIE)
     if not expected or expected != state:
         raise HTTPException(status_code=400, detail="state 가 일치하지 않습니다")
     profile = await auth.exchange_code(cfg, provider, code, state)
     user = await auth.upsert_user(db, profile)
+    audit.mark(request, "auth", f"login:{provider}", user.id)
     response = RedirectResponse(f"{cfg.frontend_url}?login=ok", status_code=302)
     response.set_cookie(auth.SESSION_COOKIE, auth.issue_session(cfg, user), **auth.cookie_kwargs(cfg))
     response.delete_cookie(auth.STATE_COOKIE, path="/")
@@ -163,11 +166,12 @@ async def auth_callback(provider: str, request: Request, code: str | None = Quer
 
 
 @router.post("/auth/dev/login", response_model=UserOut, summary="로컬 개발용 데모 로그인 (ALLOW_DEV_LOGIN=true 일 때만)")
-async def auth_dev_login(response: Response, nickname: str = Query("데모 사용자", max_length=100), cfg: Settings = Depends(get_settings),
-                         db: AsyncSession = Depends(get_db)) -> UserOut:
+async def auth_dev_login(request: Request, response: Response, nickname: str = Query("데모 사용자", max_length=100),
+                         cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> UserOut:
     if not cfg.allow_dev_login:
         raise HTTPException(status_code=404, detail="Not Found")
     user = await auth.upsert_user(db, auth.ProviderProfile("dev", nickname, nickname, ""))
+    audit.mark(request, "auth", "login:dev", user.id)
     response.set_cookie(auth.SESSION_COOKIE, auth.issue_session(cfg, user), **auth.cookie_kwargs(cfg))
     return _user_out(user)
 

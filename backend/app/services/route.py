@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..config import Settings
-from ..models import RouteChoice, RouteRequest, RouteResult, User, UserPolicy
+from ..models import EngineRun, PolicyUpdate, RouteChoice, RouteRequest, RouteResult, User, UserPolicy
 from ..schemas import ChooseResponse, NamedPoint, RouteSearchRequest, RouteSearchResponse, StoredRouteResponse
 from . import engine_client
 from .personalization import Policy, rerank, update
@@ -92,12 +92,36 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
             generalized_cost_s=(r.get("features") or {}).get("generalized_cost_s"), payload=r,
         ))
     db.add(record)
+    run = _engine_run(record, result.get("metadata") or {}, len(routes), req.options.k)
+    if run is not None:
+        db.add(run)
     await db.commit()
     metadata = dict(result.get("metadata", {}))
     metadata["backend_elapsed_ms"] = record.elapsed_ms
     metadata["personalized"] = personalized
     return RouteSearchResponse(request_id=str(record.id), profile=req.profile, departure_at=_iso(departure_at),
                                prefer_shade=req.prefer_shade, weather=weather, routes=routes, metadata=metadata, personalized=personalized)
+
+
+def _engine_run(record: RouteRequest, meta: dict, routes_returned: int, k: int) -> EngineRun | None:
+    """엔진 metadata 를 성능 로그 행으로 펼친다 (metadata 가 없으면 None)."""
+    if not meta:
+        return None
+    aco = meta.get("aco") or {}
+    ga = meta.get("ga") or {}
+    return EngineRun(
+        request=record, profile=record.profile, k=k,
+        corridor_nodes=int(meta.get("corridor_nodes") or 0), corridor_edges=int(meta.get("corridor_edges") or 0),
+        blocked_edges=int(meta.get("blocked_edges") or 0),
+        snap_origin_m=meta.get("snap_origin_m"), snap_destination_m=meta.get("snap_destination_m"),
+        aco_iterations=int(aco.get("iterations") or 0), aco_ants_completed=int(aco.get("ants_completed") or 0),
+        aco_ants_failed=int(aco.get("ants_failed") or 0), aco_stopped_by=str(aco.get("stopped_by") or "")[:32],
+        aco_elapsed_ms=aco.get("elapsed_ms"), ga_enabled=bool(ga.get("enabled", bool(ga))),
+        ga_generations=int(ga.get("generations") or 0), ga_elapsed_ms=ga.get("elapsed_ms"),
+        archive_size=int(meta.get("archive_size") or 0), routes_returned=routes_returned,
+        engine_elapsed_ms=meta.get("elapsed_ms"), backend_elapsed_ms=record.elapsed_ms,
+        shade_status=str(meta.get("shade_status") or "")[:32], weather_flags=list(meta.get("weather_flags") or []),
+    )
 
 
 async def record_choice(cfg: Settings, db: AsyncSession, request_id: uuid.UUID, route_id: str, user: User | None) -> ChooseResponse | None:
@@ -124,6 +148,10 @@ async def record_choice(cfg: Settings, db: AsyncSession, request_id: uuid.UUID, 
         learned = new_policy.updates > policy.updates
         if learned:
             await save_policy(db, user.id, new_policy, row)
+            db.add(PolicyUpdate(user_id=user.id, request_id=record.id, route_id=route_id, shown_rank=chosen.rank,
+                                engine_rank=chosen.engine_rank, explored=bool(record.explored), updates_after=new_policy.updates,
+                                weights_before={k: round(v, 4) for k, v in policy.weights.items()},
+                                weights_after={k: round(v, 4) for k, v in new_policy.weights.items()}))
         updates = new_policy.updates
         summary = new_policy.summary()
         choice.learned = learned

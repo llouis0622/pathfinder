@@ -108,3 +108,72 @@ class PlaceSearch(Base):
     query: Mapped[str] = mapped_column(String(200))
     source: Mapped[str] = mapped_column(String(16), default="")
     result_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ApiAccessLog(Base):
+    """API 접근·인증 이벤트 로그 (미들웨어가 기록)."""
+
+    __tablename__ = "api_access_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    kind: Mapped[str] = mapped_column(String(16), default="api", index=True)      # api | auth | admin
+    method: Mapped[str] = mapped_column(String(8), default="")
+    path: Mapped[str] = mapped_column(String(200), default="", index=True)
+    status: Mapped[int] = mapped_column(Integer, default=0)
+    duration_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(300), default="")
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)               # 인증 이벤트 종류, 오류 메시지 등
+
+
+class EngineRun(Base):
+    """검색 1건의 엔진 성능 지표 (튜닝 근거)."""
+
+    __tablename__ = "engine_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("route_requests.id", ondelete="CASCADE"), index=True)
+    profile: Mapped[str] = mapped_column(String(32), index=True)
+    k: Mapped[int] = mapped_column(Integer, default=3)
+    corridor_nodes: Mapped[int] = mapped_column(Integer, default=0)
+    corridor_edges: Mapped[int] = mapped_column(Integer, default=0)
+    blocked_edges: Mapped[int] = mapped_column(Integer, default=0)
+    snap_origin_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    snap_destination_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aco_iterations: Mapped[int] = mapped_column(Integer, default=0)
+    aco_ants_completed: Mapped[int] = mapped_column(Integer, default=0)
+    aco_ants_failed: Mapped[int] = mapped_column(Integer, default=0)
+    aco_stopped_by: Mapped[str] = mapped_column(String(32), default="")
+    aco_elapsed_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ga_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    ga_generations: Mapped[int] = mapped_column(Integer, default=0)
+    ga_elapsed_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    archive_size: Mapped[int] = mapped_column(Integer, default=0)
+    routes_returned: Mapped[int] = mapped_column(Integer, default=0)
+    engine_elapsed_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    backend_elapsed_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shade_status: Mapped[str] = mapped_column(String(32), default="")
+    weather_flags: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    request: Mapped[RouteRequest] = relationship()
+
+
+class PolicyUpdate(Base):
+    """개인화 정책 갱신 이력 (선택 1건당 1행)."""
+
+    __tablename__ = "policy_updates"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    request_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("route_requests.id", ondelete="SET NULL"), nullable=True)
+    route_id: Mapped[str] = mapped_column(String(32))
+    shown_rank: Mapped[int] = mapped_column(Integer)
+    engine_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    explored: Mapped[bool] = mapped_column(Boolean, default=False)
+    updates_after: Mapped[int] = mapped_column(Integer, default=0)
+    weights_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    weights_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)

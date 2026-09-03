@@ -1,0 +1,400 @@
+"""관리자 API (/api/admin). 모든 조회는 `pf_admin` 세션 쿠키가 필요하다."""
+from __future__ import annotations
+
+import csv
+import io
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import Select, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from . import admin, audit
+from .config import Settings
+from .models import ApiAccessLog, EngineRun, PlaceSearch, PolicyUpdate, RouteChoice, RouteRequest, RouteResult, User, UserPolicy
+from .services import admin_stats as stats
+from .services.personalization import Policy
+
+KST = ZoneInfo("Asia/Seoul")
+EXPORT_LIMIT = 50_000
+
+router = APIRouter(prefix="/api/admin", tags=["admin"])
+guarded = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin.require_admin)])
+
+
+def get_settings(request: Request) -> Settings:
+    return request.app.state.settings
+
+
+async def get_db(request: Request):
+    async for s in request.app.state.db.session():
+        yield s
+
+
+def _uuid(value: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="id 형식이 올바르지 않습니다") from exc
+
+
+def _date(value: str | None, end: bool = False) -> datetime | None:
+    """YYYY-MM-DD (KST) → UTC. end=True 면 그날 끝."""
+    if not value:
+        return None
+    try:
+        d = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=KST)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="날짜는 YYYY-MM-DD 형식이어야 합니다") from exc
+    if end:
+        d += timedelta(days=1)
+    return d.astimezone(timezone.utc)
+
+
+class Page(BaseModel):
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=50, ge=1, le=200)
+
+
+def page_params(page: int = Query(1, ge=1), size: int = Query(50, ge=1, le=200)) -> Page:
+    return Page(page=page, size=size)
+
+
+async def paginate(db: AsyncSession, stmt: Select, pg: Page) -> tuple[list, int]:
+    total = int((await db.execute(select(func.count()).select_from(stmt.order_by(None).subquery()))).scalar_one())
+    rows = (await db.execute(stmt.offset((pg.page - 1) * pg.size).limit(pg.size))).all()
+    return rows, total
+
+
+def envelope(items: list, total: int, pg: Page) -> dict:
+    return {"items": items, "total": total, "page": pg.page, "size": pg.size, "pages": max(1, -(-total // pg.size))}
+
+
+# ---------------------------------------------------------------- 인증
+class LoginBody(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+
+
+@router.get("/me", summary="관리자 세션 상태")
+async def admin_me(request: Request, cfg: Settings = Depends(get_settings)) -> dict:
+    return {"configured": admin.enabled(cfg), "admin": admin.is_admin(request)}
+
+
+@router.post("/login", summary="관리자 로그인 (ADMIN_PASSWORD)")
+async def admin_login(body: LoginBody, request: Request, response: Response, cfg: Settings = Depends(get_settings)) -> dict:
+    if not admin.enabled(cfg):
+        raise HTTPException(status_code=404, detail="Not Found")
+    ip = audit.client_ip(request)
+    remaining = admin.locked_for(cfg, ip)
+    if remaining:
+        audit.mark(request, "admin", "login_locked")
+        raise HTTPException(status_code=429, detail=f"로그인 시도가 너무 많습니다. {remaining}초 후 다시 시도하세요")
+    if not admin.check_password(cfg, ip, body.password):
+        audit.mark(request, "admin", "login_failed")
+        raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다")
+    audit.mark(request, "admin", "login")
+    response.set_cookie(admin.ADMIN_COOKIE, admin.issue_session(cfg), **admin.cookie_kwargs(cfg))
+    return {"admin": True}
+
+
+@router.post("/logout", summary="관리자 로그아웃")
+async def admin_logout(request: Request, response: Response) -> dict:
+    audit.mark(request, "admin", "logout")
+    response.delete_cookie(admin.ADMIN_COOKIE, path="/")
+    return {"admin": False}
+
+
+# ---------------------------------------------------------------- 대시보드·분석
+@guarded.get("/overview", summary="대시보드 KPI·추이·최근 활동")
+async def overview(db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.overview(db)
+
+
+@guarded.get("/analytics/usage", summary="이용 추이")
+async def analytics_usage(days: int = Query(30, ge=1, le=365), db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.usage(db, days)
+
+
+@guarded.get("/analytics/quality", summary="경로 품질·선택률")
+async def analytics_quality(days: int = Query(30, ge=1, le=365), db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.quality(db, days)
+
+
+@guarded.get("/analytics/spatial", summary="공간 분석 (인기 출발·도착·역)")
+async def analytics_spatial(days: int = Query(30, ge=1, le=365), db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.spatial(db, days)
+
+
+@guarded.get("/analytics/engine", summary="엔진 성능 집계")
+async def analytics_engine(days: int = Query(30, ge=1, le=365), db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.engine_stats(db, days)
+
+
+@guarded.get("/preferences", summary="학습된 취향 분포와 사용자별 가중치")
+async def preferences(db: AsyncSession = Depends(get_db)) -> dict:
+    return await stats.preferences(db)
+
+
+# ---------------------------------------------------------------- 로그
+@guarded.get("/logs/requests", summary="경로 검색 요청 로그")
+async def log_requests(pg: Page = Depends(page_params), profile: str | None = Query(None), status: str | None = Query(None),
+                       user_id: str | None = Query(None), q: str | None = Query(None, max_length=100),
+                       date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to"),
+                       personalized: bool | None = Query(None), db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(RouteRequest).order_by(RouteRequest.created_at.desc())
+    if profile:
+        stmt = stmt.where(RouteRequest.profile == profile)
+    if status:
+        stmt = stmt.where(RouteRequest.status == status)
+    if user_id:
+        stmt = stmt.where(RouteRequest.user_id == _uuid(user_id))
+    if personalized is not None:
+        stmt = stmt.where(RouteRequest.personalized == personalized)
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(RouteRequest.origin_name.ilike(like), RouteRequest.dest_name.ilike(like)))
+    if (start := _date(date_from)) is not None:
+        stmt = stmt.where(RouteRequest.created_at >= start)
+    if (end := _date(date_to, end=True)) is not None:
+        stmt = stmt.where(RouteRequest.created_at < end)
+    rows, total = await paginate(db, stmt, pg)
+    reqs = [r[0] for r in rows]
+    users = await stats.users_by_id(db, {r.user_id for r in reqs if r.user_id})
+    chosen = await stats.choices_by_request(db, [r.id for r in reqs])
+    counts: dict[uuid.UUID, int] = {}
+    if reqs:
+        cnt = (await db.execute(select(RouteResult.request_id, func.count(RouteResult.id)).where(RouteResult.request_id.in_([r.id for r in reqs]))
+                                .group_by(RouteResult.request_id))).all()
+        counts = {rid: int(n) for rid, n in cnt}
+    items = [stats.request_row(r, users.get(r.user_id), counts.get(r.id, 0), (chosen[r.id].shown_rank if r.id in chosen else None)) for r in reqs]
+    return envelope(items, total, pg)
+
+
+@guarded.get("/logs/requests/{request_id}", summary="경로 검색 요청 상세 (결과·선택·엔진·정책 갱신)")
+async def log_request_detail(request_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    rid = _uuid(request_id)
+    record = (await db.execute(select(RouteRequest).where(RouteRequest.id == rid).options(selectinload(RouteRequest.results)))).scalar_one_or_none()
+    if record is None:
+        raise HTTPException(status_code=404, detail="요청을 찾을 수 없습니다")
+    user = await db.get(User, record.user_id) if record.user_id else None
+    choice = (await db.execute(select(RouteChoice).where(RouteChoice.request_id == rid).order_by(RouteChoice.created_at.desc()))).scalars().first()
+    run = (await db.execute(select(EngineRun).where(EngineRun.request_id == rid))).scalars().first()
+    update = (await db.execute(select(PolicyUpdate).where(PolicyUpdate.request_id == rid))).scalars().first()
+    results = sorted(record.results, key=lambda r: r.rank)
+    return {
+        "request": stats.request_row(record, user, len(results), (choice.shown_rank if choice else None)),
+        "weather": record.weather, "options": record.options, "propensities": record.propensities, "metadata": record.engine_metadata,
+        "routes": [{"rank": r.rank, "engine_rank": r.engine_rank, "summary": r.summary, "badges": r.badges or [], "cautions": r.cautions or [],
+                    "total_duration_min": r.total_duration_min, "walk_distance_m": r.walk_distance_m, "transfers": r.transfers,
+                    "generalized_cost_s": r.generalized_cost_s, "payload": r.payload} for r in results],
+        "choice": (stats.choice_row(choice, record, user) if choice else None),
+        "engine_run": (stats.engine_row(run, record) if run else None),
+        "policy_update": (stats.policy_update_row(update) if update else None),
+    }
+
+
+@guarded.get("/logs/access", summary="API 접근·인증 로그")
+async def log_access(pg: Page = Depends(page_params), kind: str | None = Query(None), path: str | None = Query(None, max_length=200),
+                     status_min: int | None = Query(None, ge=100, le=599), user_id: str | None = Query(None),
+                     date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to"),
+                     db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(ApiAccessLog).order_by(ApiAccessLog.created_at.desc())
+    if kind:
+        stmt = stmt.where(ApiAccessLog.kind == kind)
+    if path:
+        stmt = stmt.where(ApiAccessLog.path.like(f"{path}%"))
+    if status_min is not None:
+        stmt = stmt.where(ApiAccessLog.status >= status_min)
+    if user_id:
+        stmt = stmt.where(ApiAccessLog.user_id == _uuid(user_id))
+    if (start := _date(date_from)) is not None:
+        stmt = stmt.where(ApiAccessLog.created_at >= start)
+    if (end := _date(date_to, end=True)) is not None:
+        stmt = stmt.where(ApiAccessLog.created_at < end)
+    rows, total = await paginate(db, stmt, pg)
+    logs = [r[0] for r in rows]
+    users = await stats.users_by_id(db, {a.user_id for a in logs if a.user_id})
+    return envelope([stats.access_row(a, users.get(a.user_id)) for a in logs], total, pg)
+
+
+@guarded.get("/logs/engine", summary="엔진 성능 로그")
+async def log_engine(pg: Page = Depends(page_params), profile: str | None = Query(None),
+                     date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to"),
+                     db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(EngineRun, RouteRequest).join(RouteRequest, RouteRequest.id == EngineRun.request_id).order_by(EngineRun.created_at.desc())
+    if profile:
+        stmt = stmt.where(EngineRun.profile == profile)
+    if (start := _date(date_from)) is not None:
+        stmt = stmt.where(EngineRun.created_at >= start)
+    if (end := _date(date_to, end=True)) is not None:
+        stmt = stmt.where(EngineRun.created_at < end)
+    rows, total = await paginate(db, stmt, pg)
+    return envelope([stats.engine_row(run, req) for run, req in rows], total, pg)
+
+
+@guarded.get("/logs/choices", summary="경로 선택 로그")
+async def log_choices(pg: Page = Depends(page_params), user_id: str | None = Query(None), learned: bool | None = Query(None),
+                      db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(RouteChoice, RouteRequest).join(RouteRequest, RouteRequest.id == RouteChoice.request_id).order_by(RouteChoice.created_at.desc())
+    if user_id:
+        stmt = stmt.where(RouteChoice.user_id == _uuid(user_id))
+    if learned is not None:
+        stmt = stmt.where(RouteChoice.learned == learned)
+    rows, total = await paginate(db, stmt, pg)
+    users = await stats.users_by_id(db, {c.user_id for c, _ in rows if c.user_id})
+    return envelope([stats.choice_row(c, req, users.get(c.user_id)) for c, req in rows], total, pg)
+
+
+@guarded.get("/logs/policy-updates", summary="개인화 정책 갱신 이력")
+async def log_policy_updates(pg: Page = Depends(page_params), user_id: str | None = Query(None), db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(PolicyUpdate).order_by(PolicyUpdate.created_at.desc())
+    if user_id:
+        stmt = stmt.where(PolicyUpdate.user_id == _uuid(user_id))
+    rows, total = await paginate(db, stmt, pg)
+    return envelope([stats.policy_update_row(p[0]) for p in rows], total, pg)
+
+
+@guarded.get("/logs/places", summary="장소 검색 로그")
+async def log_places(pg: Page = Depends(page_params), q: str | None = Query(None, max_length=100), db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(PlaceSearch).order_by(PlaceSearch.created_at.desc())
+    if q:
+        stmt = stmt.where(PlaceSearch.query.ilike(f"%{q}%"))
+    rows, total = await paginate(db, stmt, pg)
+    items = [{"id": str(p.id), "created_at": stats.iso(p.created_at), "query": p.query, "source": p.source, "result_count": p.result_count}
+             for (p,) in rows]
+    return envelope(items, total, pg)
+
+
+# ---------------------------------------------------------------- 사용자
+@guarded.get("/users", summary="사용자 목록 (활동 통계 포함)")
+async def users_list(pg: Page = Depends(page_params), q: str | None = Query(None, max_length=100), provider: str | None = Query(None),
+                     sort: str = Query("last_login", pattern="^(last_login|created|requests|choices|updates)$"),
+                     db: AsyncSession = Depends(get_db)) -> dict:
+    req_cnt = select(RouteRequest.user_id, func.count(RouteRequest.id).label("n")).group_by(RouteRequest.user_id).subquery()
+    ch_cnt = select(RouteChoice.user_id, func.count(RouteChoice.id).label("n")).group_by(RouteChoice.user_id).subquery()
+    stmt = (select(User, func.coalesce(req_cnt.c.n, 0), func.coalesce(ch_cnt.c.n, 0), func.coalesce(UserPolicy.updates, 0), UserPolicy.policy)
+            .outerjoin(req_cnt, req_cnt.c.user_id == User.id).outerjoin(ch_cnt, ch_cnt.c.user_id == User.id)
+            .outerjoin(UserPolicy, UserPolicy.user_id == User.id))
+    if q:
+        stmt = stmt.where(User.nickname.ilike(f"%{q}%"))
+    if provider:
+        stmt = stmt.where(User.provider == provider)
+    order = {"last_login": User.last_login_at.desc().nullslast(), "created": User.created_at.desc(),
+             "requests": func.coalesce(req_cnt.c.n, 0).desc(), "choices": func.coalesce(ch_cnt.c.n, 0).desc(),
+             "updates": func.coalesce(UserPolicy.updates, 0).desc()}[sort]
+    stmt = stmt.order_by(order, User.created_at.desc())
+    rows, total = await paginate(db, stmt, pg)
+    items = []
+    for u, n_req, n_ch, updates, policy in rows:
+        summary = Policy.from_dict(policy).summary() if policy else []
+        items.append({**stats.user_out(u), "requests": int(n_req), "choices": int(n_ch), "updates": int(updates), "summary": summary})
+    providers = (await db.execute(select(User.provider, func.count(User.id)).group_by(User.provider))).all()
+    return {**envelope(items, total, pg), "providers": [{"provider": p, "count": int(n)} for p, n in providers]}
+
+
+@guarded.get("/users/{user_id}", summary="사용자 상세 (취향·요청·선택·정책 이력)")
+async def user_detail(user_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    uid = _uuid(user_id)
+    user = await db.get(User, uid)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    policy_row = await db.get(UserPolicy, uid)
+    policy = Policy.from_dict(policy_row.policy) if policy_row else Policy()
+    reqs = (await db.execute(select(RouteRequest).where(RouteRequest.user_id == uid).order_by(RouteRequest.created_at.desc()).limit(20))).scalars().all()
+    chosen = await stats.choices_by_request(db, [r.id for r in reqs])
+    choices = (await db.execute(select(RouteChoice, RouteRequest).join(RouteRequest, RouteRequest.id == RouteChoice.request_id)
+                                .where(RouteChoice.user_id == uid).order_by(RouteChoice.created_at.desc()).limit(50))).all()
+    updates = (await db.execute(select(PolicyUpdate).where(PolicyUpdate.user_id == uid).order_by(PolicyUpdate.created_at))).scalars().all()
+    n_req = int((await db.execute(select(func.count(RouteRequest.id)).where(RouteRequest.user_id == uid))).scalar_one())
+    n_ch = int((await db.execute(select(func.count(RouteChoice.id)).where(RouteChoice.user_id == uid))).scalar_one())
+    n_pers = int((await db.execute(select(func.count(RouteRequest.id)).where(RouteRequest.user_id == uid, RouteRequest.personalized.is_(True)))).scalar_one())
+    last_access = (await db.execute(select(ApiAccessLog).where(ApiAccessLog.user_id == uid).order_by(ApiAccessLog.created_at.desc()).limit(10))).scalars().all()
+    profiles = (await db.execute(select(RouteRequest.profile, func.count(RouteRequest.id)).where(RouteRequest.user_id == uid)
+                                 .group_by(RouteRequest.profile))).all()
+    return {
+        "user": stats.user_out(user),
+        "stats": {"requests": n_req, "choices": n_ch, "personalized_requests": n_pers, "policy_updates": len(updates),
+                  "rank1_choice_rate": stats.rate(sum(1 for c, _ in choices if c.shown_rank == 1), len(choices)),
+                  "profiles": [{"profile": p, "label": stats.PROFILE_LABELS.get(p, p), "count": int(n)} for p, n in profiles]},
+        "policy": {**stats.policy_out(policy), "updated_at": (stats.iso(policy_row.updated_at) if policy_row else None)},
+        "recent_requests": [stats.request_row(r, user, None, (chosen[r.id].shown_rank if r.id in chosen else None)) for r in reqs],
+        "choices": [stats.choice_row(c, req, user) for c, req in choices],
+        "policy_history": [stats.policy_update_row(p) for p in updates],
+        "recent_access": [stats.access_row(a, user) for a in last_access],
+    }
+
+
+@guarded.delete("/users/{user_id}/policy", summary="사용자 취향(정책) 초기화")
+async def user_reset_policy(user_id: str, request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    uid = _uuid(user_id)
+    row = await db.get(UserPolicy, uid)
+    if row is not None:
+        await db.delete(row)
+        await db.commit()
+    audit.mark(request, "admin", f"reset_policy:{uid}")
+    return {"ok": True, "reset": row is not None}
+
+
+# ---------------------------------------------------------------- CSV 내보내기
+def _csv(rows: list[dict[str, Any]], fields: list[str], name: str) -> StreamingResponse:
+    buf = io.StringIO()
+    buf.write("﻿")  # 엑셀용 BOM
+    w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
+    w.writeheader()
+    for r in rows:
+        w.writerow({k: ("" if v is None else v) for k, v in r.items()})
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
+                             headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
+
+
+@guarded.get("/export/{kind}.csv", summary="CSV 내보내기 (requests | choices | users | access | engine)")
+async def export_csv(kind: str, days: int = Query(30, ge=1, le=3650), db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    start, _ = stats.window(days)
+    if kind == "requests":
+        rows = (await db.execute(select(RouteRequest).where(RouteRequest.created_at >= start).order_by(RouteRequest.created_at.desc())
+                                 .limit(EXPORT_LIMIT))).scalars().all()
+        data = [{"id": str(r.id), "created_at": stats.iso(r.created_at), "user_id": (str(r.user_id) if r.user_id else ""), "profile": r.profile,
+                 "origin_name": r.origin_name, "origin_lat": r.origin_lat, "origin_lng": r.origin_lng, "dest_name": r.dest_name,
+                 "dest_lat": r.dest_lat, "dest_lng": r.dest_lng, "status": r.status, "elapsed_ms": r.elapsed_ms,
+                 "personalized": r.personalized, "explored": r.explored, "prefer_shade": bool((r.options or {}).get("prefer_shade")),
+                 "weather_flags": "|".join((r.weather or {}).get("flags") or []), "error": r.error} for r in rows]
+        return _csv(data, list(data[0].keys()) if data else ["id"], f"requests_{days}d")
+    if kind == "choices":
+        rows = (await db.execute(select(RouteChoice, RouteRequest).join(RouteRequest, RouteRequest.id == RouteChoice.request_id)
+                                 .where(RouteChoice.created_at >= start).order_by(RouteChoice.created_at.desc()).limit(EXPORT_LIMIT))).all()
+        data = [stats.choice_row(c, req) for c, req in rows]
+        for d in data:
+            d.pop("user", None)
+        return _csv(data, list(data[0].keys()) if data else ["id"], f"choices_{days}d")
+    if kind == "users":
+        rows = (await db.execute(select(User, UserPolicy).outerjoin(UserPolicy, UserPolicy.user_id == User.id).order_by(User.created_at))).all()
+        data = [{**stats.user_out(u), "updates": (p.updates if p else 0), "summary": " / ".join(Policy.from_dict(p.policy).summary() if p else [])}
+                for u, p in rows]
+        return _csv(data, list(data[0].keys()) if data else ["id"], "users")
+    if kind == "access":
+        rows = (await db.execute(select(ApiAccessLog).where(ApiAccessLog.created_at >= start).order_by(ApiAccessLog.created_at.desc())
+                                 .limit(EXPORT_LIMIT))).scalars().all()
+        data = [stats.access_row(a) for a in rows]
+        for d in data:
+            d.pop("user", None)
+        return _csv(data, list(data[0].keys()) if data else ["id"], f"access_{days}d")
+    if kind == "engine":
+        rows = (await db.execute(select(EngineRun, RouteRequest).join(RouteRequest, RouteRequest.id == EngineRun.request_id)
+                                 .where(EngineRun.created_at >= start).order_by(EngineRun.created_at.desc()).limit(EXPORT_LIMIT))).all()
+        data = []
+        for run, req in rows:
+            row = stats.engine_row(run, req)
+            aco, ga = row.pop("aco"), row.pop("ga")
+            row.update({f"aco_{k}": v for k, v in aco.items()})
+            row.update({f"ga_{k}": v for k, v in ga.items()})
+            row["weather_flags"] = "|".join(row["weather_flags"])
+            data.append(row)
+        return _csv(data, list(data[0].keys()) if data else ["id"], f"engine_{days}d")
+    raise HTTPException(status_code=404, detail="알 수 없는 내보내기 종류입니다")
