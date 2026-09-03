@@ -1,0 +1,1226 @@
+{
+  "type": "FeatureCollection",
+  "schemaVersion": "busan-osm-unramped-steps-v1",
+  "generatedAt": "2026-08-13T12:42:16.668694+00:00",
+  "source": {
+    "name": "OpenStreetMap via Geofabrik",
+    "url": "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf",
+    "md5": "34c61e371d5e98e54f87dbec2e804308",
+    "license": "ODbL 1.0",
+    "localSnapshotPreparedAt": "2026-07-24T22:09:20.402684+00:00"
+  },
+  "filter": {
+    "highway": "steps",
+    "ramp": "no"
+  },
+  "featureCount": 41,
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 76287927,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 118
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0338468,
+            35.1008791
+          ],
+          [
+            129.0335172,
+            35.1007908
+          ],
+          [
+            129.0332463,
+            35.1006855
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 129603749,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 19
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.177104,
+            35.1566951
+          ],
+          [
+            129.1770866,
+            35.156665
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 453771374,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 50
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0334013,
+            35.0996387
+          ],
+          [
+            129.0333094,
+            35.0997879
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 453771375,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 40
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0347133,
+            35.1039134
+          ],
+          [
+            129.0344759,
+            35.1039153
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 457657100,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1236446,
+            35.1226085
+          ],
+          [
+            129.1240372,
+            35.1226467
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 502508746,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 50
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0308516,
+            35.1084221
+          ],
+          [
+            129.0311359,
+            35.1082618
+          ],
+          [
+            129.0312383,
+            35.1083025
+          ],
+          [
+            129.0313126,
+            35.1083159
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 502513967,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0301,
+            35.1106942
+          ],
+          [
+            129.0304058,
+            35.1107476
+          ],
+          [
+            129.0307475,
+            35.1108185
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 502543956,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1775406,
+            35.1573771
+          ],
+          [
+            129.1769588,
+            35.1568533
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 626525990,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 5
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1252021,
+            35.1659674
+          ],
+          [
+            129.1251547,
+            35.1659368
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 761369684,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1059861,
+            35.148908
+          ],
+          [
+            129.1057414,
+            35.1488559
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 983658176,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            128.9782953,
+            35.0683332
+          ],
+          [
+            128.9782441,
+            35.0683868
+          ],
+          [
+            128.9782327,
+            35.0683973
+          ],
+          [
+            128.9781961,
+            35.0684313
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 983658178,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            128.9783948,
+            35.0685561
+          ],
+          [
+            128.9784176,
+            35.0685373
+          ],
+          [
+            128.9785024,
+            35.0684614
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1060005351,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 37
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1769587,
+            35.1554531
+          ],
+          [
+            129.1769383,
+            35.1554765
+          ],
+          [
+            129.1769846,
+            35.1555589
+          ],
+          [
+            129.1769993,
+            35.1555773
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1060005353,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 37
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1808808,
+            35.1551544
+          ],
+          [
+            129.1809637,
+            35.1550558
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1147086914,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0093883,
+            35.0979741
+          ],
+          [
+            129.0093559,
+            35.0979835
+          ],
+          [
+            129.0092922,
+            35.0980307
+          ],
+          [
+            129.0092513,
+            35.098059
+          ],
+          [
+            129.0092005,
+            35.0980941
+          ],
+          [
+            129.0091444,
+            35.0981055
+          ],
+          [
+            129.0091225,
+            35.098153
+          ],
+          [
+            129.0090394,
+            35.0982172
+          ],
+          [
+            129.0090032,
+            35.0982238
+          ],
+          [
+            129.0089683,
+            35.0982688
+          ],
+          [
+            129.008912,
+            35.0983193
+          ],
+          [
+            129.0088543,
+            35.0983566
+          ],
+          [
+            129.008776,
+            35.098411
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1147086915,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0095706,
+            35.0981473
+          ],
+          [
+            129.0096379,
+            35.0981643
+          ],
+          [
+            129.0098013,
+            35.0981992
+          ],
+          [
+            129.0098749,
+            35.0982189
+          ],
+          [
+            129.0099356,
+            35.0982339
+          ],
+          [
+            129.0099919,
+            35.0982432
+          ],
+          [
+            129.0100454,
+            35.0982429
+          ],
+          [
+            129.0101394,
+            35.0982452
+          ],
+          [
+            129.0101818,
+            35.0982515
+          ],
+          [
+            129.0101971,
+            35.0982567
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1276366829,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1049825,
+            35.1497599
+          ],
+          [
+            129.105041,
+            35.1499859
+          ],
+          [
+            129.1050491,
+            35.1502294
+          ],
+          [
+            129.1050256,
+            35.1502868
+          ],
+          [
+            129.1049801,
+            35.1503982
+          ],
+          [
+            129.1048148,
+            35.1507059
+          ],
+          [
+            129.1047433,
+            35.1509399
+          ],
+          [
+            129.1047277,
+            35.150983
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1276366832,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1049538,
+            35.1493618
+          ],
+          [
+            129.1049159,
+            35.1493983
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1276366837,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1012445,
+            35.1536472
+          ],
+          [
+            129.10118,
+            35.1536845
+          ],
+          [
+            129.1011412,
+            35.1537491
+          ],
+          [
+            129.1010061,
+            35.1537563
+          ],
+          [
+            129.10077,
+            35.1537652
+          ],
+          [
+            129.1004746,
+            35.153789
+          ],
+          [
+            129.1003448,
+            35.1538244
+          ],
+          [
+            129.1003141,
+            35.1538735
+          ],
+          [
+            129.1002584,
+            35.1539061
+          ],
+          [
+            129.1001937,
+            35.15391
+          ],
+          [
+            129.1001335,
+            35.1539071
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1276366840,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1053772,
+            35.1491026
+          ],
+          [
+            129.1051812,
+            35.1492185
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1276366850,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1055079,
+            35.1490109
+          ],
+          [
+            129.1054406,
+            35.1490652
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480765,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0201231,
+            35.1154077
+          ],
+          [
+            129.0202752,
+            35.1157444
+          ],
+          [
+            129.0205347,
+            35.1159764
+          ],
+          [
+            129.0206604,
+            35.1161004
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480766,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0206604,
+            35.1161004
+          ],
+          [
+            129.0210355,
+            35.1164847
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480774,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 19
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0282789,
+            35.1102965
+          ],
+          [
+            129.028244,
+            35.110223
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480778,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0283915,
+            35.1105839
+          ],
+          [
+            129.0283366,
+            35.1104281
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480800,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 98
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0250331,
+            35.1146567
+          ],
+          [
+            129.0252182,
+            35.1147728
+          ],
+          [
+            129.0254724,
+            35.1149322
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480801,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 96
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0246137,
+            35.1144062
+          ],
+          [
+            129.0248547,
+            35.1145501
+          ],
+          [
+            129.0250331,
+            35.1146567
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480803,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0243119,
+            35.1142766
+          ],
+          [
+            129.0243937,
+            35.114338
+          ],
+          [
+            129.0245875,
+            35.1144324
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1334480809,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 46
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0240811,
+            35.1140929
+          ],
+          [
+            129.0241127,
+            35.114072
+          ],
+          [
+            129.0241543,
+            35.1141016
+          ],
+          [
+            129.0242469,
+            35.1140561
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335336742,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 80
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0339019,
+            35.1097027
+          ],
+          [
+            129.0342427,
+            35.1098253
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335336743,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 134
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.0318405,
+            35.1094042
+          ],
+          [
+            129.0312031,
+            35.1088922
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335917862,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 50
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1783729,
+            35.1552928
+          ],
+          [
+            129.1783702,
+            35.1552805
+          ],
+          [
+            129.1782628,
+            35.1552391
+          ],
+          [
+            129.1782343,
+            35.1551753
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335917863,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 35
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1811138,
+            35.1550688
+          ],
+          [
+            129.1811018,
+            35.1551764
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335917867,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 78
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1830723,
+            35.1559845
+          ],
+          [
+            129.1831855,
+            35.155892
+          ],
+          [
+            129.1831808,
+            35.1558364
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335917868,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 58
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.184285,
+            35.1573755
+          ],
+          [
+            129.1844304,
+            35.1572777
+          ],
+          [
+            129.1843271,
+            35.1570672
+          ],
+          [
+            129.1844478,
+            35.1569575
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335917869,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1858148,
+            35.1592304
+          ],
+          [
+            129.1858748,
+            35.1591921
+          ],
+          [
+            129.1860156,
+            35.1592655
+          ],
+          [
+            129.1860826,
+            35.1592217
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1335917870,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 72
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.185504,
+            35.1589444
+          ],
+          [
+            129.1856441,
+            35.1589509
+          ],
+          [
+            129.1857809,
+            35.1588138
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1337948939,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.151924,
+            35.1531164
+          ],
+          [
+            129.1520742,
+            35.1528678
+          ],
+          [
+            129.1522072,
+            35.1527433
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1337948940,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.152425,
+            35.1525557
+          ],
+          [
+            129.1524128,
+            35.1524773
+          ],
+          [
+            129.1523713,
+            35.152374
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1338247214,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.1309387,
+            35.1610981
+          ],
+          [
+            129.1309572,
+            35.1610757
+          ],
+          [
+            129.1309887,
+            35.1610889
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osmWayId": 1371649468,
+        "highway": "steps",
+        "ramp": "no",
+        "source": "OpenStreetMap",
+        "license": "ODbL 1.0",
+        "stepCount": 15
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            129.2293059,
+            35.2184106
+          ],
+          [
+            129.2292892,
+            35.218463
+          ]
+        ]
+      }
+    }
+  ]
+}

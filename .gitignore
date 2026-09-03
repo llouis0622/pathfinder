@@ -1,74 +1,38 @@
-# ======================
-# 환경변수 (API 키 포함 — 절대 커밋 금지)
-# ======================
+# 환경변수 (API 키 포함, 커밋 금지)
 .env
-.env.local
-.env.*.local
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
-backend/.env
-ai/.env
+.env.*
+!.env.example
+**/.env
+!**/.env.example
 
-# ======================
 # Python
-# ======================
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
 .venv/
 venv/
-env/
 *.egg-info/
-*.egg
-dist/
-build/
 .pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
 .ruff_cache/
-pip-wheel-metadata/
+.mypy_cache/
+htmlcov/
+.coverage
 
-# ======================
-# Node / pnpm
-# ======================
+# Node
 node_modules/
-frontend/node_modules/
-.pnpm-store/
-frontend/.pnpm-store/
-
-# ======================
-# Vite 빌드 결과물
-# ======================
 frontend/dist/
 frontend/.vite/
 
-# ======================
-# Docker
-# ======================
-*.log
-docker-compose.local.yml
+# 대용량 빌드 산출물 (오프라인 파이프라인 결과)
+data/build/
+data/raw/
+*.osm.pbf
+*.graphml
+*.parquet
+*.npz
+!data/samples/*.npz
 
-# ======================
-# IDE
-# ======================
+# IDE / OS
 .idea/
 .vscode/
-*.swp
-*.swo
-*.swa
-
-# ======================
-# macOS
-# ======================
 .DS_Store
-.AppleDouble
-.LSOverride
-
-# ======================
-# 기타
-# ======================
-*.bak
-*.tmp
+*.log
