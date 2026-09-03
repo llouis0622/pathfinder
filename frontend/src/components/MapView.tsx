@@ -29,6 +29,7 @@ type Props = {
 
 const NO_INSET: MapInset = { top: 0, right: 0, bottom: 0, left: 0 }
 const STYLE_TIMEOUT_MS = 8000
+const READY_TIMEOUT_MS = 15000   // 이때까지 지도가 못 뜨면(워커·WebGL 차단 등) 약식 지도로
 
 function pinElement(label: string, dark: boolean): HTMLElement {
   const el = document.createElement('div')
@@ -82,6 +83,7 @@ export default function MapView({ origin, destination, routes, selectedId, overl
       if (!loaded && !e.sourceId) fallbackToBlank()
     })
     const timer = window.setTimeout(fallbackToBlank, STYLE_TIMEOUT_MS)
+    const giveUp = window.setTimeout(() => { if (!loaded) setFailed(true) }, READY_TIMEOUT_MS)
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     const geolocate = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true, timeout: 10000 }, trackUserLocation: true, showAccuracyCircle: true })
     map.addControl(geolocate, 'bottom-right')
@@ -92,6 +94,7 @@ export default function MapView({ origin, destination, routes, selectedId, overl
       if (loaded) return
       loaded = true
       window.clearTimeout(timer)
+      window.clearTimeout(giveUp)
       if (!map.getSource(GRAPH_SOURCE)) {
         map.addSource(GRAPH_SOURCE, { type: 'vector', tiles: [tilesUrl(window.location.origin)], minzoom: GRAPH_MIN_ZOOM, maxzoom: 18 })
         map.addSource('routes-other', { type: 'geojson', data: otherRoutesGeoJSON([], null) })
@@ -114,6 +117,7 @@ export default function MapView({ origin, destination, routes, selectedId, overl
     ro?.observe(containerRef.current)
     return () => {
       window.clearTimeout(timer)
+      window.clearTimeout(giveUp)
       ro?.disconnect()
       map.remove()
       mapRef.current = null
