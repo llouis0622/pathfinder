@@ -56,6 +56,31 @@
    8. 각 경로의 구간(leg)·특성(경사·그늘·계단·엘리베이터·환승)·배지·주의사항을 만든다.
 5. 백엔드가 요청과 결과를 로그 테이블에 남기고 프론트에 돌려준다.
 
+## API
+
+### backend (`:8000`)
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/health` | 백엔드 + 엔진 상태 |
+| GET | `/api/profiles` | 프로필 목록 (엔진에서 가져오고, 실패 시 정적 목록) |
+| GET | `/api/place/search?query&lat&lng` | 장소 검색. Kakao Local(키 있을 때) → 로컬 지하철역·버스정류장 색인 |
+| GET | `/api/weather?lat&lng&at` | 날씨 컨텍스트. `at`이 30분 이상 미래면 시간별 예보 |
+| POST | `/api/route` | 경로 Top K. 본문: `origin, destination, profile, departure_at, weather_mode(auto/manual/none), manual_weather, options{k, time_budget_s, seed}` |
+| GET | `/api/route/{request_id}` | 저장된 요청·결과 조회 |
+
+`POST /api/route` 응답: `request_id, profile, departure_at, weather{source, flags[], …}, routes[](엔진 RouteOut 그대로), metadata`.
+엔진이 422(경로 없음)를 주면 백엔드도 422로 전달하고 요청은 `status=no_route`로 남긴다.
+
+### engine (`:8001`, 내부)
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/health` | 그래프 스토어 상태 |
+| GET | `/api/profiles` | 프로필 id·라벨·설명·속도 |
+| GET | `/api/snap?lat&lng` | 가장 가까운 보행 노드 (커버리지 확인용) |
+| POST | `/api/search` | `SearchRequest` → `SearchResponse` (routes[], metadata: 회랑 크기·차단 엣지·그늘 상태·ACO/GA 통계) |
+
 ## 디렉토리
 
 ```
@@ -72,7 +97,7 @@ pathfinder/
 │   │   └── pipeline/       # 오프라인 데이터 빌드 스크립트
 │   └── tests/
 ├── backend/
-│   ├── app/{main,config,database}.py, routers/, services/, models/, schemas/
+│   ├── app/{main,config,database,models,schemas,routers,http}.py, services/{weather,places,engine_client,route}.py
 │   └── tests/
 ├── frontend/src/{api,components,hooks,pages,types}
 ├── data/               # DEM, 지하철 CSV, 버스 정류장 CSV, 경계, 샘플 그래프
