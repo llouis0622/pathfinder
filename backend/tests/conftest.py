@@ -47,6 +47,15 @@ class FakeExternal:
             return httpx.Response(200, json=[{"id": "wheelchair", "label": "휠체어 이용자", "description": "d", "speed_mps": 1.0}])
         if host in ("engine", "localhost", "127.0.0.1") and path == "/health":
             return httpx.Response(200, json={"status": "ok"})
+        if host in ("engine", "localhost", "127.0.0.1") and path == "/api/nearest-edge":
+            if float(request.url.params["lat"]) > 80:
+                return httpx.Response(422, json={"detail": "반경 안에 보행 엣지가 없습니다"})
+            return httpx.Response(200, json={"edge_id": 1234, "kind": "vertical", "distance_m": 4.2, "stairs": 0, "elevator": 1, "kerb": "", "name": "A역"})
+        if host in ("engine", "localhost", "127.0.0.1") and path == "/api/stats":
+            return httpx.Response(200, json={"nodes": {"total": 418, "by_kind": {"walk": 400}}, "edges": {"total": 1540, "by_kind": {}},
+                                             "walk": {"edges": 1400, "grade_coverage": 0.9}, "vertical": {"elevator": {"yes": 10, "no": 2, "unknown": 3}},
+                                             "buildings": {"total": 31, "height_known": 30, "height_coverage": 0.97},
+                                             "connectivity": {"components": 1, "largest_share": 1.0, "isolated_walk_nodes": 0}, "source": "grid_city"})
         if host in ("engine", "localhost", "127.0.0.1") and path == "/api/tiles/meta":
             return httpx.Response(200, json={"minzoom": 14, "extent": 4096, "layers": {"edges": "e"}})
         if host in ("engine", "localhost", "127.0.0.1") and path.startswith("/api/tiles/"):

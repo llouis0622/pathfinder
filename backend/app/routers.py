@@ -117,10 +117,10 @@ async def shade(min_lat: float = Query(..., ge=-90, le=90), min_lng: float = Que
 
 # ---------------------------------------------------------------- 경로
 @router.post("/route", response_model=RouteSearchResponse, summary="교통약자 맞춤 경로 Top 3 (로그인 시 개인화 재정렬)")
-async def route(req: RouteSearchRequest, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db),
+async def route(req: RouteSearchRequest, request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db),
                 user: User | None = Depends(get_user)) -> RouteSearchResponse:
     try:
-        return await search_and_store(cfg, db, req, user)
+        return await search_and_store(cfg, db, req, user, cache=getattr(request.app.state, "search_cache", None))
     except engine_client.EngineError as exc:
         raise HTTPException(status_code=exc.status if exc.status in (422, 503) else 502, detail=exc.detail) from exc
 

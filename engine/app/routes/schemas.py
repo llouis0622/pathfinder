@@ -35,7 +35,15 @@ class Preferences(BaseModel):
     prefer_shade: bool = Field(default=False, description="그늘 우선 (날씨와 무관하게 그늘 없는 보행 구간 비용 가중)")
 
 
+class EdgeOverride(BaseModel):
+    """시설 제보로 확정된 엣지 속성 변경 (백엔드가 검색마다 전달)."""
+
+    edge_id: int
+    kind: Literal["elevator_broken", "stairs", "kerb", "blocked", "ok"]
+
+
 class SearchRequest(BaseModel):
+    overrides: list[EdgeOverride] = Field(default_factory=list, description="시설 제보 오버라이드")
     origin: LatLng
     destination: LatLng
     profile: ProfileId
@@ -125,6 +133,7 @@ class RouteOut(BaseModel):
 
 
 class SearchMetadata(BaseModel):
+    overrides_applied: int = 0
     profile: str
     profile_label: str
     weather_flags: list[str]

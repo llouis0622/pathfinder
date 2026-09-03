@@ -14,6 +14,7 @@ from ..features.shade import edge_shade_ratios
 from ..features.solar import KST
 from ..graph.corridor import CorridorSpec
 from ..graph.store import GraphStore, SnapError
+from ..overrides import apply_overrides, block_costs
 from ..routes.builder import assign_badges, build_route
 from ..routes.schemas import SearchMetadata, SearchRequest, SearchResponse
 from .aco import ACOParams, AntColony
@@ -74,10 +75,15 @@ def search_routes(
     buildings = store.buildings_in(spec.bbox(spec.walk_axis_m))
     shade, shade_info = edge_shade_ratios(sub, buildings, departure_at)
 
+    # 3b. 시설 제보 오버라이드 (회랑 배열은 요청마다 새로 만들어지므로 제자리 수정해도 안전)
+    ov = apply_overrides(sub, [o if isinstance(o, dict) else o.model_dump() for o in request.overrides])
+
     # 4. 비용, 5. cost-to-go
     prefs = request.preferences
     cost = compute_costs(sub, profile, weather, shade, avoid_slope=prefs.avoid_slope, prefer_shade=prefs.prefer_shade,
                          shade_available=(shade_info.status == "computed"))
+    if ov.blocked:
+        block_costs(cost.cost, cost.blocked, ov.blocked)
     h = cost_to_go(sub, cost.cost, d_idx)
     if not np.isfinite(h[o_idx]):
         raise NoRouteError(f"{profile.label} 조건으로 통과 가능한 경로가 없습니다 (차단 엣지 {cost.n_blocked}개).")
@@ -120,6 +126,7 @@ def search_routes(
         profile=profile.id, profile_label=profile.label, weather_flags=weather.active_flags(),
         departure_at=departure_at.isoformat(), preferences=prefs.model_dump(),
         corridor_nodes=sub.num_nodes, corridor_edges=sub.num_edges, blocked_edges=cost.n_blocked,
+        overrides_applied=ov.applied,
         snap_origin_m=round(o.distance_m, 1), snap_destination_m=round(d.distance_m, 1),
         shade_status=shade_info.status, shade_note=shade_info.note, solar_elevation_deg=shade_info.solar_elevation_deg,
         building_height_coverage=(None if shade_info.coverage is None else round(shade_info.coverage, 3)),

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     aco_iterations: int = 60
     ga_generations: int = 25
     log_level: str = "INFO"
+    tile_cache_size: int = 4096          # 타일 LRU 항목 수 (0 이면 캐시 끔)
 
 
 settings = Settings()

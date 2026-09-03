@@ -6,11 +6,14 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from . import tiles
 from .api.routes import router
 from .config import Settings, settings
 from .graph.factory import build_store
@@ -29,6 +32,7 @@ def create_app(store: GraphStore | None = None, config: Settings | None = None) 
         app.state.store = store or build_store(
             cfg.graph_source, bundle_path=cfg.graph_bundle_path, buildings_path=cfg.buildings_path, dsn=cfg.database_url,
         )
+        app.state.tile_cache = tiles.TileCache(cfg.tile_cache_size)
         log.info("그래프 스토어 준비: %s", app.state.store.describe())
         yield
 
@@ -40,6 +44,18 @@ def create_app(store: GraphStore | None = None, config: Settings | None = None) 
     )
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     app.include_router(router)
+
+    @app.middleware("http")
+    async def request_id(request: Request, call_next):
+        rid = (request.headers.get("X-Request-ID") or "").strip()[:64] or uuid.uuid4().hex
+        request.state.request_id = rid
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
+    @app.get("/metrics", include_in_schema=False)
+    def metrics() -> Response:
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/health", summary="헬스체크")
     def health(request: Request):
