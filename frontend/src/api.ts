@@ -1,4 +1,4 @@
-import type { ShadeResponse, AuthProviders, ChooseResponse, Place, Preferences, Profile, Route, RouteSearchRequest, RouteSearchResponse, User, Weather } from './types'
+import type { ProfileId, ShadeResponse, AuthProviders, ChooseResponse, Place, Preferences, Profile, Route, RouteSearchRequest, RouteSearchResponse, User, Weather } from './types'
 
 // VITE_BACKEND_URL 이 비어 있으면 같은 오리진의 /api 를 쓴다 (vite proxy / nginx).
 const base = (import.meta.env.VITE_BACKEND_URL ?? '').replace(/\/$/, '')
@@ -50,7 +50,8 @@ export function searchRoutes(payload: RouteSearchRequest): Promise<RouteSearchRe
   return request('/api/route', { method: 'POST', body: JSON.stringify(payload) })
 }
 
-export function fetchStoredRoute(requestId: string): Promise<{ routes: Route[]; status: string }> {
+export type StoredRoute = { request_id: string; routes: Route[]; status: string; profile: ProfileId; origin: { lat: number; lng: number; name: string }; destination: { lat: number; lng: number; name: string }; created_at: string; weather: Weather | null; metadata: RouteSearchResponse['metadata'] | null }
+export function fetchStoredRoute(requestId: string): Promise<StoredRoute> {
   return request(`/api/route/${encodeURIComponent(requestId)}`)
 }
 
@@ -100,3 +101,15 @@ export async function fetchShade(bbox: { min_lat: number; min_lng: number; max_l
   }
   return res.json() as Promise<ShadeResponse>
 }
+
+// ---------------------------------------------------------------- 즐겨찾기·최근 (로그인)
+export type MyPlace = { id: string; label: string; name: string; address: string; lat: number; lng: number; sort: number }
+export const fetchMyPlaces = () => request<MyPlace[]>('/api/me/places')
+export const addMyPlace = (p: { label: string; name: string; address: string; lat: number; lng: number }) => request<MyPlace>('/api/me/places', { method: 'POST', body: JSON.stringify(p) })
+export const deleteMyPlace = (id: string) => request<{ ok: boolean }>(`/api/me/places/${id}`, { method: 'DELETE' })
+export const fetchRecent = () => request<{ origin: { name: string; lat: number; lng: number }; destination: { name: string; lat: number; lng: number }; profile: string; at: string }[]>('/api/me/recent')
+
+// ---------------------------------------------------------------- 시설 제보
+export const fetchReportKinds = () => request<{ kind: string; label: string }[]>('/api/reports/kinds')
+export const createReport = (body: { lat: number; lng: number; kind: string; note?: string; place_name?: string; request_id?: string }) =>
+  request<{ id: string; status: string; kind: string; kind_label: string; created_at: string }>('/api/reports', { method: 'POST', body: JSON.stringify(body) })

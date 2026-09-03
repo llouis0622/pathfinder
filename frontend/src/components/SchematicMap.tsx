@@ -73,7 +73,7 @@ export default function SchematicMap({ origin, destination, routes, selectedId, 
   if (!project) {
     return (
       <div ref={wrapRef} className="schematic schematic--empty" role="img" aria-label="지도">
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#b0b8c1" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z" /><path d="M9 3v15M15 6v15" />
         </svg>
       </div>
@@ -94,10 +94,10 @@ export default function SchematicMap({ origin, destination, routes, selectedId, 
     <svg className="schematic__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="약식 경로 지도">
       <defs>
         <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M40 0H0V40" fill="none" stroke="#e5e8eb" strokeWidth="1" />
+          <path d="M40 0H0V40" fill="none" stroke="var(--g200)" strokeWidth="1" />
         </pattern>
       </defs>
-      <rect width={W} height={H} fill="#f7f8fa" />
+      <rect width={W} height={H} fill="var(--g50)" />
       <rect width={W} height={H} fill="url(#grid)" />
       {routes.filter((r) => r !== selected).map((r) => (
         <polyline key={r.id} points={toPoints(r.path)} fill="none" stroke={WALK_COLOR} strokeWidth={5} strokeOpacity={0.7} strokeLinecap="round"

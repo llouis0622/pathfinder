@@ -6,11 +6,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import audit, auth
 from .config import Settings
-from .models import PlaceSearch, User
+from .models import PlaceSearch, RouteRequest, User, UserPlace
 from .schemas import (
     ChooseRequest,
     ChooseResponse,
@@ -234,3 +236,74 @@ async def reset_preferences(db: AsyncSession = Depends(get_db), user: User | Non
         await db.delete(row)
         await db.commit()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- 즐겨찾기·최근 검색 (로그인 사용자)
+class UserPlaceIn(BaseModel):
+    label: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=200)
+    address: str = Field(default="", max_length=300)
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+
+
+def _place_out(p: UserPlace) -> dict:
+    return {"id": str(p.id), "label": p.label, "name": p.name, "address": p.address, "lat": p.lat, "lng": p.lng, "sort": p.sort}
+
+
+@router.get("/me/places", summary="즐겨찾기 장소 목록")
+async def my_places(db: AsyncSession = Depends(get_db), user: User | None = Depends(get_user)) -> list[dict]:
+    if user is None:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다")
+    rows = (await db.execute(select(UserPlace).where(UserPlace.user_id == user.id).order_by(UserPlace.sort, UserPlace.created_at))).scalars().all()
+    return [_place_out(p) for p in rows]
+
+
+@router.post("/me/places", status_code=201, summary="즐겨찾기 추가 (같은 라벨이 있으면 덮어씀, 최대 20개)")
+async def add_place(body: UserPlaceIn, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_user)) -> dict:
+    if user is None:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다")
+    rows = (await db.execute(select(UserPlace).where(UserPlace.user_id == user.id))).scalars().all()
+    existing = next((p for p in rows if p.label == body.label.strip()), None)
+    if existing is None and len(rows) >= 20:
+        raise HTTPException(status_code=422, detail="즐겨찾기는 20개까지 저장할 수 있어요")
+    if existing is None:
+        existing = UserPlace(user_id=user.id, label=body.label.strip(), sort=len(rows))
+        db.add(existing)
+    existing.name, existing.address, existing.lat, existing.lng = body.name.strip(), body.address.strip(), body.lat, body.lng
+    await db.commit()
+    await db.refresh(existing)
+    return _place_out(existing)
+
+
+@router.delete("/me/places/{place_id}", summary="즐겨찾기 삭제")
+async def delete_place(place_id: str, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_user)) -> dict:
+    if user is None:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다")
+    p = await db.get(UserPlace, _uuid(place_id))
+    if p is None or p.user_id != user.id:
+        raise HTTPException(status_code=404, detail="즐겨찾기를 찾을 수 없습니다")
+    await db.delete(p)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/me/recent", summary="최근 검색 (출발·도착 쌍, 중복 제거)")
+async def my_recent(limit: int = Query(8, ge=1, le=30), db: AsyncSession = Depends(get_db), user: User | None = Depends(get_user)) -> list[dict]:
+    if user is None:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다")
+    rows = (await db.execute(select(RouteRequest).where(RouteRequest.user_id == user.id, RouteRequest.status == "ok")
+                             .order_by(RouteRequest.created_at.desc()).limit(200))).scalars().all()
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for r in rows:
+        key = (round(r.origin_lat, 4), round(r.origin_lng, 4), round(r.dest_lat, 4), round(r.dest_lng, 4))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"origin": {"name": r.origin_name, "lat": r.origin_lat, "lng": r.origin_lng},
+                    "destination": {"name": r.dest_name, "lat": r.dest_lat, "lng": r.dest_lng},
+                    "profile": r.profile, "at": r.created_at.isoformat()})
+        if len(out) >= limit:
+            break
+    return out

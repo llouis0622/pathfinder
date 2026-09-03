@@ -108,3 +108,22 @@ def test_choice_learns_and_reranks_for_logged_in_user(auth_client, external):
 
 def test_preferences_require_login(auth_client):
     assert auth_client.get("/api/me/preferences").status_code == 401
+
+
+def test_places_and_recent(auth_client):
+    c = auth_client
+    assert c.get("/api/me/places").status_code == 401
+    r = c.post("/api/auth/dev/login", params={"nickname": "즐겨찾기"})
+    c.cookies.set("pf_session", r.cookies["pf_session"])
+    home = c.post("/api/me/places", json={"label": "집", "name": "우리집", "lat": 35.15, "lng": 129.06}).json()
+    assert home["label"] == "집" and c.get("/api/me/places").json()[0]["name"] == "우리집"
+    again = c.post("/api/me/places", json={"label": "집", "name": "새집", "lat": 35.16, "lng": 129.07}).json()
+    assert again["id"] == home["id"] and again["name"] == "새집" and len(c.get("/api/me/places").json()) == 1
+    c.post("/api/route", json=ROUTE_BODY)
+    c.post("/api/route", json=ROUTE_BODY)
+    c.post("/api/route", json={**ROUTE_BODY, "destination": {"lat": 35.2, "lng": 129.1, "name": "다른 곳"}})
+    recent = c.get("/api/me/recent").json()
+    assert len(recent) == 2 and recent[0]["destination"]["name"] == "다른 곳" and recent[1]["origin"]["name"] == "출발"
+    assert c.delete(f"/api/me/places/{home['id']}").json() == {"ok": True}
+    assert c.get("/api/me/places").json() == []
+    assert c.delete(f"/api/me/places/{home['id']}").status_code == 404
