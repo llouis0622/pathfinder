@@ -9,6 +9,7 @@ pytestmark = pytest.mark.skipif(not DEFAULT_DEM.is_file(), reason="부산 DEM �
 
 @pytest.fixture(scope="module")
 def dem():
+    pytest.importorskip("rasterio")   # 파이프라인 전용 의존성(requirements-pipeline.txt)
     return Dem.load()
 
 

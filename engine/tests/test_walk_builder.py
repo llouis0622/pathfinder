@@ -1,10 +1,12 @@
 import numpy as np
-import pandas as pd
 import pytest
 from shapely.geometry import LineString
 
 from app.graph.model import TRI_FALSE, TRI_TRUE, TRI_UNKNOWN
-from app.pipeline.build_walk_graph import build_from_frames, load_unramped_way_ids
+
+# pandas 는 파이프라인 전용 의존성(requirements-pipeline.txt). 없으면 이 파일만 건너뛴다
+pd = pytest.importorskip("pandas")
+from app.pipeline.build_walk_graph import build_from_frames, load_unramped_way_ids  # noqa: E402
 
 
 def _frames():
