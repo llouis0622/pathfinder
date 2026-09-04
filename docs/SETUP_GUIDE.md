@@ -3,19 +3,21 @@
 이 문서는 "어디서 받아서, 어느 파일의 어느 줄에 적는지"를 한 항목씩 끝까지 적었다.
 요약표는 [CHECKLIST.md](CHECKLIST.md)에 있다.
 
-## 0. 먼저 알아둘 것: 값을 적는 파일은 세 개
+## 0. 먼저 알아둘 것: 값을 적는 파일은 루트 `.env` 하나
 
-각 서비스는 **자기 폴더의 `.env`** 를 읽는다. 루트 `.env.example` 은 Docker Compose(Phase 5)용 통합본이라 지금은 참고만 한다.
+```bash
+cp .env.example .env        # 저장소 루트
+```
 
-| 서비스 | 만드는 방법 | 읽는 변수 |
-|---|---|---|
-| 백엔드 | `cp backend/.env.example backend/.env` | DB, 엔진 주소, Kakao REST 키, 카카오·네이버 로그인, JWT, 관리자, 날씨 |
-| 엔진 | `cp engine/.env.example engine/.env` | 그래프 소스, PostGIS 주소, 탐색 예산 |
-| 프론트 | `cp frontend/.env.example frontend/.env` | VWorld 키, 배경 스타일 URL |
-| 파이프라인(터미널) | `.env` 없이 명령 인자 또는 셸 변수 | `BUS_SERVICE_KEY`, `--pbf`, `--postgis` |
+백엔드·엔진·프론트·파이프라인·Docker Compose 가 **모두 이 파일을 읽는다**. 아래 항목의 "어디에 기입" 은 전부 이 파일의 해당 줄이다.
+(서비스 폴더에 따로 `backend/.env` 같은 파일을 두면 그 값이 우선하지만, 보통은 필요 없다.)
 
-규칙: `KEY=value` 한 줄, 따옴표 없이, `=` 양옆 공백 없이. 값을 바꾼 뒤에는 해당 서비스를 재시작한다.
-`.env` 는 `.gitignore` 에 있어 커밋되지 않는다. 절대 커밋하지 않는다.
+- `DATABASE_URL` 은 한 줄만 쓴다. 엔진(psycopg)·백엔드(asyncpg)가 드라이버 접두어를 알아서 맞춘다.
+- 키가 없는 항목은 비워 둔다. 그 기능만 축소 동작한다(표는 [CHECKLIST.md](CHECKLIST.md) "없으면" 열).
+- 다 적었으면 `python scripts/doctor.py` 로 확인하고, 서비스를 다시 올린다 (`scripts/bootstrap.sh` 또는 `docker compose up -d --build`).
+  관리자 대시보드의 **설정 상태** 카드가 같은 점검을 보여 준다.
+
+규칙: `KEY=value` 한 줄, 따옴표 없이, `=` 양옆 공백 없이. `.env` 는 `.gitignore` 에 있어 커밋되지 않는다. 절대 커밋하지 않는다.
 
 ---
 
@@ -31,20 +33,15 @@
   ```
 - 직접 설치: PostgreSQL 16 설치 후 `CREATE EXTENSION postgis;` 를 DB에서 실행. 사용자·DB 이름은 위와 맞추면 예시 값을 그대로 쓸 수 있다.
 
-**어디에 기입**
-
-- `backend/.env`
-  ```
-  DATABASE_URL=postgresql+asyncpg://pathfinder:pathfinder_dev@localhost:5432/pathfinder
-  ```
-  (백엔드는 asyncpg 드라이버라 `postgresql+asyncpg://` 접두어가 꼭 들어간다)
-- `engine/.env`
-  ```
-  DATABASE_URL=postgresql://pathfinder:pathfinder_dev@localhost:5432/pathfinder
-  GRAPH_SOURCE=postgis_memory
-  ```
-  (엔진은 psycopg 라 접두어가 `postgresql://` 이다. `postgis_memory` 는 시작 시 전체 그래프를 메모리에 올려 빠르다)
-- 비밀번호를 바꿨다면 두 줄 모두 같은 값으로 바꾼다.
+**어디에 기입**: 루트 `.env`
+```
+POSTGRES_PASSWORD=pathfinder_dev
+DATABASE_URL=postgresql://pathfinder:pathfinder_dev@db:5432/pathfinder     # Compose 용. 컨테이너 없이 로컬이면 db → localhost
+GRAPH_SOURCE=auto
+```
+- 접두어는 `postgresql://` 하나로 충분하다. 엔진과 백엔드가 각자 드라이버에 맞게 바꿔 읽는다.
+- `GRAPH_SOURCE=auto` 는 PostGIS 에 그래프가 있으면 그것을, 없으면 `data/build` 의 빌드 산출물을, 그것도 없으면 샘플 격자 도시를 쓴다. 9번 빌드 뒤에 따로 바꿀 것이 없다.
+- 운영(`docker-compose.prod.yml`)에서는 `POSTGRES_PASSWORD` 만 보고 `DATABASE_URL` 을 조합하므로 비밀번호 한 줄만 바꾸면 된다.
 
 **확인**: `psql "$DATABASE_URL" -c "select postgis_version();"` 가 버전을 출력하면 된다.
 
@@ -58,11 +55,11 @@ openssl rand -base64 48
 ```
 출력된 64자 문자열을 복사한다. (Windows PowerShell: `[Convert]::ToBase64String((1..48|%{Get-Random -Max 256}))`)
 
-**어디에 기입**: `backend/.env`
+**어디에 기입**: 루트 `.env`
 ```
 JWT_SECRET=여기에_복사한_문자열
 ```
-기본값 `change-me-in-production` 그대로 두면 누구나 세션 쿠키를 위조할 수 있으니 운영에서는 반드시 바꾼다. 값을 바꾸면 기존 로그인 세션은 모두 풀린다.
+기본값 그대로 두면 누구나 세션 쿠키를 위조할 수 있으니 운영에서는 반드시 바꾼다. (`scripts/bootstrap.sh` 는 비어 있으면 자동으로 만들어 준다.) 값을 바꾸면 기존 로그인 세션은 모두 풀린다.
 
 ---
 
@@ -70,7 +67,7 @@ JWT_SECRET=여기에_복사한_문자열
 
 **받는 방법**: 직접 정한다. 16자 이상, 다른 곳에서 안 쓰는 값. `openssl rand -base64 18` 로 만들어도 좋다.
 
-**어디에 기입**: `backend/.env`
+**어디에 기입**: 루트 `.env` (비워 두면 `scripts/bootstrap.sh` 가 만들어 출력한다)
 ```
 ADMIN_PASSWORD=정한_비밀번호
 ADMIN_SESSION_HOURS=12
@@ -94,12 +91,7 @@ ADMIN_LOGIN_LOCKOUT_S=300
    curl -L -o data/raw/south-korea-latest.osm.pbf https://download.geofabrik.de/asia/south-korea-latest.osm.pbf
    ```
 
-**어디에 기입**: 파일 위치만 명령 인자로 준다 (환경변수 아님)
-```bash
-cd engine && pip install -r requirements-pipeline.txt
-python -m app.pipeline.run_all --pbf ../data/raw/south-korea-latest.osm.pbf ...
-```
-(전체 명령은 8번 "그래프 빌드"에 있다)
+**어디에 기입**: 기입할 것 없음. `data/raw/south-korea-latest.osm.pbf` 에 두면 파이프라인이 기본값으로 찾는다 (9번 참고).
 
 ---
 
@@ -116,17 +108,11 @@ python -m app.pipeline.run_all --pbf ../data/raw/south-korea-latest.osm.pbf ...
    - 활용 API: **2D 지도(WMTS/WMS)** 와 **데이터 API(WFS)** 를 함께 체크 (하나의 키로 둘 다 된다)
 4. 승인되면 목록에 인증키(영숫자 32자 안팎)가 보인다. 복사.
 
-**어디에 기입**
-- 프론트 `frontend/.env`
-  ```
-  VITE_VWORLD_KEY=복사한_인증키
-  ```
-  `npm run dev` 를 다시 시작해야 반영된다 (Vite 는 시작 시 env 를 읽는다).
-- (선택, 건물 실측 높이) 루트 `.env` 또는 셸 변수
-  ```
-  VWORLD_API_KEY=같은_인증키
-  ```
-  9번 빌드 명령에 `--vworld-key 같은_인증키` 를 붙이거나 셸에 `export VWORLD_API_KEY=...` 를 두면 OSM 건물 중 높이를 모르는 것을 VWorld 실측 높이로 채운다 (없어도 빌드는 된다).
+**어디에 기입**: 루트 `.env`
+```
+VITE_VWORLD_KEY=복사한_인증키        # 배경 지도 (프론트 빌드 시점에 들어간다 → npm run dev 재시작 / prod 는 --build)
+VWORLD_API_KEY=같은_인증키           # (선택) 파이프라인이 OSM 건물 중 높이를 모르는 것을 VWorld 실측 높이로 채운다
+```
 
 **확인**: 프론트를 띄우고 지도가 회색이 아니라 국내 지도(건물 윤곽·동 이름)로 보이면 된다. 회색이면 브라우저 콘솔에서 `api.vworld.kr` 요청이 401/403 인지 본다 → 도메인 불일치가 대부분이다.
 
@@ -144,7 +130,7 @@ python -m app.pipeline.run_all --pbf ../data/raw/south-korea-latest.osm.pbf ...
 **6-a. 장소 검색용 REST API 키**
 
 - 별도 활성화 필요 없음. **앱 설정 → 플랫폼 → Web** 에 사이트 도메인을 등록해 두면 좋다 (`http://localhost:5173`, 운영 도메인).
-- 어디에 기입: `backend/.env`
+- 어디에 기입: 루트 `.env`
   ```
   KAKAO_REST_API_KEY=REST_API_키
   ```
@@ -155,15 +141,15 @@ python -m app.pipeline.run_all --pbf ../data/raw/south-korea-latest.osm.pbf ...
 1. 앱 → **제품 설정 → 카카오 로그인** → **활성화 설정 ON**
 2. 같은 화면 **Redirect URI 등록** → 다음 값을 **정확히** 추가 (끝에 슬래시 없음)
    - 개발: `http://localhost:8000/api/auth/kakao/callback`
-   - 운영: `https://api.pathfinder.example.com/api/auth/kakao/callback` (백엔드가 공개되는 주소 + `/api/auth/kakao/callback`)
+   - 운영: `https://pathfinder.example.com/api/auth/kakao/callback` (`SITE_ADDRESS` + `/api/auth/kakao/callback`. 운영 compose 는 프론트와 API 가 같은 도메인이다)
 3. **제품 설정 → 카카오 로그인 → 동의항목** → `닉네임(profile_nickname)` 필수 동의, `프로필 사진(profile_image)` 선택 동의로 설정. 이메일은 쓰지 않는다.
 4. (권장) **앱 설정 → 보안 → Client Secret** → 코드 생성 → 활성화 상태 "사용함". 생성된 시크릿 복사.
-5. 어디에 기입: `backend/.env`
+5. 어디에 기입: 루트 `.env`
    ```
    KAKAO_CLIENT_ID=REST_API_키          # 6-a 와 같은 값
    KAKAO_CLIENT_SECRET=생성한_시크릿     # 4번을 안 했다면 비워 둔다
-   PUBLIC_BASE_URL=http://localhost:8000   # 운영에서는 https://api.pathfinder.example.com
-   FRONTEND_URL=http://localhost:5173      # 로그인 후 돌아갈 주소
+   PUBLIC_BASE_URL=http://localhost:8000   # 개발. 운영 compose 는 SITE_ADDRESS 에서 자동으로 채운다
+   FRONTEND_URL=http://localhost:5173      # 개발. 운영은 위와 같음
    ```
    `PUBLIC_BASE_URL + /api/auth/kakao/callback` 이 2번에 등록한 값과 글자 하나까지 같아야 한다.
 6. 확인: 프론트 우상단 **로그인 → 카카오로 로그인** → 동의 → 닉네임이 보이면 성공. `KOE006` 오류는 Redirect URI 불일치, `KOE101` 은 앱 키 오류다.
@@ -177,9 +163,9 @@ python -m app.pipeline.run_all --pbf ../data/raw/south-korea-latest.osm.pbf ...
 3. **사용 API**: `네이버 로그인` 선택 → 제공 정보에서 **별명(필수)**, **프로필 사진(선택)** 체크. 이메일·이름은 불필요.
 4. **로그인 오픈 API 서비스 환경**: `PC 웹` 추가
    - 서비스 URL: `http://localhost:5173` (운영: 프론트 도메인)
-   - 네이버 로그인 Callback URL: `http://localhost:8000/api/auth/naver/callback` (운영: `https://api.pathfinder.example.com/api/auth/naver/callback`)
+   - 네이버 로그인 Callback URL: `http://localhost:8000/api/auth/naver/callback` (운영: `SITE_ADDRESS/api/auth/naver/callback`)
 5. 등록 후 **Client ID**, **Client Secret** 이 보인다. 둘 다 복사.
-6. 어디에 기입: `backend/.env`
+6. 어디에 기입: 루트 `.env`
    ```
    NAVER_CLIENT_ID=복사한_Client_ID
    NAVER_CLIENT_SECRET=복사한_Client_Secret
@@ -215,46 +201,37 @@ python -m app.pipeline.bims_fetch --out ../data/build/bims --report     # 수집
 4번(PBF)과 8번(BIMS 캐시)이 준비되면 한 번 실행한다. 저장소에 이미 있는 경계·DEM·지하철·정류장 파일은 자동으로 쓰인다.
 
 ```bash
+# Docker (권장): 루트 .env 의 DATABASE_URL·BUS_SERVICE_KEY·VWORLD_API_KEY 를 읽는다
+docker compose --profile pipeline run --rm pipeline && docker compose restart engine
+# 또는 scripts/bootstrap.sh 가 data/raw 에 PBF 가 있으면 자동으로 돌린다
+
+# 컨테이너 없이: 기본값이 data/raw 의 PBF, data/build/bims, 환경변수 DATABASE_URL 을 잡으므로 인자가 없어도 된다
 cd engine && pip install -r requirements-pipeline.txt
-python -m app.pipeline.run_all \
-    --pbf ../data/raw/south-korea-latest.osm.pbf \
-    --bims-cache ../data/build/bims \
-    --postgis postgresql://pathfinder:pathfinder_dev@localhost:5432/pathfinder
+set -a; source ../.env; set +a         # DATABASE_URL 의 호스트가 db 면 localhost 로 바꿔 둔다
+python -m app.pipeline.run_all
 ```
-- 버스 없이 먼저 보려면 `--bims-cache` 를 빼도 된다 (도보+지하철만).
-- GTFS 가 있으면 `--bims-cache` 대신 `--gtfs 폴더경로`.
-- VWorld 키가 있으면 `--vworld-key "$VWORLD_API_KEY"` 를 붙인다 (건물 실측 높이).
-- Docker 로 돌리려면: `docker compose --profile pipeline run --rm pipeline` (루트 `.env` 의 `BUS_SERVICE_KEY`, `VWORLD_API_KEY` 를 읽는다).
+- 버스 없이 먼저 보려면 `data/build/bims` 가 없어도 된다 (도보+지하철만).
+- GTFS 가 있으면 `--gtfs 폴더경로`.
 - 결과: `data/build/graph_bundle.npz`, `report.json`, 그리고 PostGIS 의 `graph_nodes/graph_edges/buildings` 테이블.
 - 걸리는 시간: PBF 읽기 포함 10~30분 (메모리 8GB 이상 권장).
 
-**어디에 기입**: 끝나면 `engine/.env` 를 실데이터로 바꾼다.
-```
-GRAPH_SOURCE=postgis_memory
-DATABASE_URL=postgresql://pathfinder:pathfinder_dev@localhost:5432/pathfinder
-```
-(`GRAPH_BUNDLE_PATH`, `BUILDINGS_PATH` 는 file 모드에서만 쓰이므로 그대로 둬도 된다)
+**어디에 기입**: 없음. `GRAPH_SOURCE=auto` 인 엔진이 재시작 때 PostGIS 그래프를 찾아 자동으로 쓴다.
 
-**확인**: 엔진 재시작 후 `curl localhost:8001/health` 의 `graph.nodes` 가 수십만 단위로 나오면 실데이터다.
+**확인**: 엔진 재시작 후 `curl localhost:8001/health` 의 `graph.nodes` 가 수십만 단위이고 `sample` 이 `false` 면 실데이터다. 관리자 **데이터 품질** 화면에서 커버리지를 본다.
 
 ---
 
 ## 10. HTTPS 도메인과 운영용 주소 (운영 배포 시)
 
-**받는 방법**: 도메인 구매(가비아·Cloudflare 등) 후 프론트·백엔드가 공개될 주소를 정한다. 예:
-- 프론트 `https://pathfinder.example.com`
-- 백엔드 `https://api.pathfinder.example.com` (또는 같은 도메인의 `/api` 를 리버스 프록시로 백엔드에 연결)
-- 인증서는 Cloudflare, Caddy, nginx + certbot 중 편한 것으로.
+**받는 방법**: 도메인 구매(가비아·Cloudflare 등) 후 A 레코드를 서버 IP 로 향하게 한다. 프론트와 API 는 같은 도메인(`/api`)을 쓴다.
+인증서는 운영 compose 의 Caddy 가 자동으로 받는다(80·443 포트가 열려 있어야 한다).
 
-**어디에 기입**: `backend/.env`
+**어디에 기입**: 루트 `.env`
 ```
-PUBLIC_BASE_URL=https://api.pathfinder.example.com
-FRONTEND_URL=https://pathfinder.example.com
-CORS_ORIGINS=https://pathfinder.example.com
-COOKIE_SECURE=true
-ALLOW_DEV_LOGIN=false
+SITE_ADDRESS=https://pathfinder.example.com
 ```
-그리고 6-b, 7 의 Redirect/Callback URI 와 5 의 VWorld 서비스 URL 을 이 도메인으로 다시 등록한다.
+`docker-compose.prod.yml` 이 이 값으로 `PUBLIC_BASE_URL`·`FRONTEND_URL`·`CORS_ORIGINS` 를 채우고 `COOKIE_SECURE=true`, `ALLOW_DEV_LOGIN=false` 를 기본으로 둔다.
+그리고 6-b, 7 의 Redirect/Callback URI 와 5 의 VWorld 서비스 URL 을 이 도메인으로 다시 등록한다. 배포 절차는 [DEPLOY.md](DEPLOY.md).
 
 GPS(현재 위치)는 브라우저 정책상 **HTTPS 에서만** 동작한다 (localhost 는 예외).
 
@@ -264,7 +241,7 @@ GPS(현재 위치)는 브라우저 정책상 **HTTPS 에서만** 동작한다 (l
 
 **OpenWeather** (필요할 때만)
 1. https://openweathermap.org → Sign up → **API keys** 탭에서 키 생성 (무료 플랜, 활성화까지 최대 2시간)
-2. `backend/.env`
+2. 루트 `.env`
    ```
    WEATHER_PROVIDER=openweather
    OPENWEATHER_API_KEY=키
@@ -293,9 +270,9 @@ GPS(현재 위치)는 브라우저 정책상 **HTTPS 에서만** 동작한다 (l
 
 ## 12. 다 채운 뒤 최종 점검 순서
 
-1. `backend/.env`, `engine/.env`, `frontend/.env` 세 파일이 있고 위 값들이 들어갔는지 본다.
-2. DB → 엔진(8001) → 백엔드(8000) → 프론트(5173) 순으로 띄운다.
-3. `curl localhost:8000/health` : `engine.status` 가 `ok`.
+1. `python scripts/doctor.py` 에 ❌ 가 없는지 본다 (🟡 는 축소 동작이라 뜨는 데는 지장 없다).
+2. `scripts/bootstrap.sh` (개발) 또는 `scripts/bootstrap.sh --prod` (운영).
+3. `curl localhost:8000/health` : `engine.status` 가 `ok`, `features.missing` 이 비어 있음. 관리자 대시보드 **설정 상태** 카드도 같은 내용.
 4. 프론트에서 실제 부산 장소로 검색 → 경로 3개.
 5. 카카오·네이버 로그인 → 경로 선택 → 다음 검색에 "내 취향 반영".
 6. `/admin` 로그인 → 대시보드에 방금 검색이 보인다.

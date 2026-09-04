@@ -52,10 +52,10 @@
 
 ## E. 발급 후 할 일 (순서)
 
-1. `.env` 를 만들고 A·B 항목 값을 채운다. `frontend/.env` 에는 `VITE_VWORLD_KEY` 만.
-2. PostGIS 를 띄우고 `run_all --pbf data/raw/south-korea-latest.osm.pbf --bims-cache data/build/bims --postgis "$DATABASE_URL"` 로 적재한다 (BIMS 는 먼저 `bims_fetch --key` 실행).
-3. 엔진을 `GRAPH_SOURCE=postgis_memory`(빠름) 또는 `postgis` 로 띄운다.
-4. Kakao/Naver 콘솔에 Redirect URI, VWorld 에 서비스 도메인을 등록한다.
-5. `/admin` 에 로그인해 대시보드에 검색이 쌓이는지 확인한다.
+1. 루트 `.env` 하나에 A·B 항목 값을 채운다 (`VITE_VWORLD_KEY` 도 같은 파일). `python scripts/doctor.py` 로 빠진 것을 확인한다.
+2. `scripts/bootstrap.sh` (개발) 또는 `scripts/bootstrap.sh --prod` (운영). `data/raw/` 에 PBF 가 있으면 파이프라인까지 돌려 PostGIS 에 적재한다 (BIMS 는 먼저 `bims_fetch --key` 로 `data/build/bims`).
+3. 엔진은 `GRAPH_SOURCE=auto` 가 PostGIS 그래프를 자동으로 고른다. 따로 바꿀 것 없음.
+4. Kakao/Naver 콘솔에 Redirect URI, VWorld 에 서비스 도메인을 등록한다 (운영은 `SITE_ADDRESS` 기준).
+5. `/admin` 대시보드의 **설정 상태** 카드에 "확인 필요" 가 없고, 검색이 쌓이는지 확인한다.
 
 자세한 절차: [DATA_PIPELINE.md](DATA_PIPELINE.md), [MAP.md](MAP.md), [PERSONALIZATION.md](PERSONALIZATION.md), [ADMIN.md](ADMIN.md)

@@ -1,0 +1,5 @@
+# SITE_ADDRESS 가 ":80" 이면 평문 HTTP, "https://도메인" 이면 자동 HTTPS(Let's Encrypt). docker-compose.prod.yml 이 환경변수로 넘긴다.
+{$SITE_ADDRESS::80} {
+	encode gzip zstd
+	reverse_proxy frontend:80
+}

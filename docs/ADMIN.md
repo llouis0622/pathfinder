@@ -70,6 +70,7 @@
 | POST | `/overrides` `{edge_id, kind, expires_days?, note?}` | 제보 없이 직접 추가 |
 | DELETE | `/overrides/{id}` | 해제 (검색에서 즉시 제외) |
 | GET | `/data-quality` | 엔진 그래프 통계(`/api/stats`: 노드·엣지 종류, 경사·폭·노면 커버리지, 계단·급경사·턱·횡단, 점자블록·조명·엘리베이터 확인/미확인, 대중교통, 건물 높이 커버리지, 보행망 연결성) + 제보 상태별 수, 활성 오버라이드, 검색 캐시 적중 |
+| GET | `/setup` | 설정 상태: 필수/권장/선택 항목별 준비됨·축소 동작·없음, 요약(`runnable`, `ready_for_production`), 엔진 상태. 같은 기준을 `/health` 의 `features` 와 `scripts/doctor.py` 가 쓴다 |
 | GET | `/alerts/settings` | 알림 설정 (웹훅 URL 은 앞 28자만 마스킹해 돌려준다) |
 | PUT | `/alerts/settings` | 보낸 필드만 갱신. `webhook_url` 은 http(s) 만, `rules` 키는 정해진 6개만 |
 | POST | `/alerts/test` | 웹훅으로 테스트 메시지 |
@@ -84,7 +85,7 @@
 
 | 경로 | 내용 |
 |---|---|
-| `/admin` | 대시보드: KPI 타일, 30일 검색·선택·사용자 선 차트, 프로필 비중, 최근 검색·인증 |
+| `/admin` | 대시보드: **설정 상태** 카드(빠진 키·데이터, 축소 동작 중인 기능, 가이드 링크), KPI 타일, 30일 검색·선택·사용자 선 차트, 프로필 비중, 최근 검색·인증 |
 | `/admin/logs/requests` | 요청 로그 (필터·페이지) → 상세: 요청 정보, 약식 지도, 후보 경로 표, 엔진 실행 지표, 이번 선택으로 움직인 가중치 |
 | `/admin/logs/access` | 접근·인증 로그 |
 | `/admin/logs/engine` | 엔진 성능 로그 |

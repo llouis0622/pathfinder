@@ -1,0 +1,176 @@
+# 운영용 Docker Compose: 빌드된 이미지, 자동 마이그레이션, nginx 정적 서빙, Caddy 자동 HTTPS, 일일 백업
+#
+#   cp .env.example .env && 값 채우기 (또는 scripts/bootstrap.sh --prod 가 비밀값을 만들어 준다)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# - SITE_ADDRESS 가 비어 있으면 http://<서버IP> (80 포트), 도메인을 넣으면(예: https://pf.example.com) Caddy 가 인증서를 자동 발급한다
+# - 부산 실데이터:  docker compose -f docker-compose.prod.yml --profile pipeline run --rm pipeline  →  docker compose -f docker-compose.prod.yml restart engine
+# - 백업:          docker compose -f docker-compose.prod.yml --profile ops up -d backup   (backups/ 에 매일 pg_dump, KEEP_DAYS 일 보관)
+
+name: pathfinder
+
+x-restart: &restart
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  db:
+    <<: *restart
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pathfinder}
+      POSTGRES_USER: ${POSTGRES_USER:-pathfinder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 를 .env 에 넣으세요}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pathfinder} -d ${POSTGRES_DB:-pathfinder}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  engine:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    environment:
+      GRAPH_SOURCE: ${GRAPH_SOURCE:-auto}
+      GRAPH_BUILD_DIR: /app/data/build
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pathfinder}
+      ENGINE_TIME_BUDGET_S: ${ENGINE_TIME_BUDGET_S:-2.5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data/build:/app/data/build:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      RUN_MIGRATIONS: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pathfinder}
+      ENGINE_URL: http://engine:8001
+      ENGINE_TIMEOUT_S: ${ENGINE_TIMEOUT_S:-30}
+      DATA_DIR: /app/data
+      # 같은 오리진(/api)으로 서비스되므로 CORS 는 공개 주소 하나면 된다
+      PUBLIC_BASE_URL: ${SITE_ADDRESS:-http://localhost}
+      FRONTEND_URL: ${SITE_ADDRESS:-http://localhost}
+      CORS_ORIGINS: ${SITE_ADDRESS:-http://localhost}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-false}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 를 .env 에 넣으세요 (openssl rand -base64 48)}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_SESSION_HOURS: ${ADMIN_SESSION_HOURS:-12}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-open_meteo}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      PERSONALIZATION_ENABLED: ${PERSONALIZATION_ENABLED:-true}
+      PERSONALIZATION_EPSILON: ${PERSONALIZATION_EPSILON:-0.1}
+      ACCESS_LOG_ENABLED: ${ACCESS_LOG_ENABLED:-true}
+      LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-90}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      SEARCH_CACHE_TTL_S: ${SEARCH_CACHE_TTL_S:-600}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_ENABLED: ${ALERT_ENABLED:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+      engine:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_VWORLD_KEY: ${VITE_VWORLD_KEY:-}
+        VITE_BASEMAP_STYLE_URL: ${VITE_BASEMAP_STYLE_URL:-}
+    depends_on:
+      - backend
+    expose:
+      - "80"
+
+  # 공개 진입점. SITE_ADDRESS 가 https://도메인 이면 Let's Encrypt 인증서를 자동으로 받는다
+  caddy:
+    <<: *restart
+    image: caddy:2.8-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+  # 매일 pg_dump (그래프 테이블 제외). backups/ 폴더에 쌓이고 KEEP_DAYS 일 뒤 삭제
+  backup:
+    <<: *restart
+    image: postgis/postgis:16-3.4
+    profiles: ["ops"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          DATABASE_URL="postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pathfinder}" KEEP_DAYS="${KEEP_DAYS:-14}" /scripts/db_backup.sh /backups || echo "backup failed"
+          sleep 86400
+        done
+    volumes:
+      - ./scripts/db_backup.sh:/scripts/db_backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 부산 실데이터 빌드 (필요할 때만)
+  pipeline:
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+      target: pipeline
+    profiles: ["pipeline"]
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pathfinder}
+      BUS_SERVICE_KEY: ${BUS_SERVICE_KEY:-}
+      VWORLD_API_KEY: ${VWORLD_API_KEY:-${VITE_VWORLD_KEY:-}}
+    volumes:
+      - ./data:/data
+      - ./data/build:/app/data/build
+    command: ["python", "-m", "app.pipeline.run_all", "--pbf", "/data/raw/south-korea-latest.osm.pbf", "--out", "/app/data/build",
+              "--boundary", "/data/boundary/busan_hangjeongdong.geojson", "--unramped", "/data/osm/busan_osm_steps_ramp_no_20260724.geojson",
+              "--dem", "/data/dem/busan_dem_clipped_90m.tif"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
