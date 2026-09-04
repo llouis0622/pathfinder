@@ -37,6 +37,9 @@ data/raw/
 .DS_Store
 *.log
 
+# 운영 백업
+backups/
+
 # E2E
 .e2e/
 frontend/playwright-report/

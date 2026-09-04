@@ -17,6 +17,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/MAP.md](docs/MAP.md) | MapLibre 지도: VWorld/OSM 배경, 그래프 벡터 타일, 실시간 그늘, GPS 출발 |
 | [docs/CHECKLIST.md](docs/CHECKLIST.md) | 발급받을 API 키와 확보할 데이터 체크리스트 |
 | [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | 키 발급 절차와 기입 위치를 항목별로 적은 상세 가이드 |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | 운영 배포: prod compose, Caddy 자동 HTTPS, 백업, 마이그레이션, 업데이트 |
 
 ## 진행 상태
 
@@ -29,35 +30,40 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | Phase 4 | 프론트엔드(MapLibre 지도 + 그래프 벡터 타일, 프로필·조건, Top 3 카드·구간 안내·경사/그늘/시설 오버레이, GPS 출발) | 완료 |
 | Phase 5 | Docker Compose(개발용), GitHub Actions CI, 로그 보존·정리, 개인화 오프라인 평가(IPS), 그늘 시각 슬라이더, VWorld 건물 높이 병합 | 완료 |
 
-## Docker Compose 로 한 번에 띄우기
+## 빠른 시작 (키 없이도 뜬다)
+
+설정 파일은 루트 `.env` **하나**다. 모든 서비스가 이 파일을 읽고, 키가 없는 기능은 축소 동작(샘플 격자 도시·OSM 배경·역/정류장 이름 검색)으로 대신한다.
+키를 넣고 다시 올리면 그 기능이 켜진다.
 
 ```bash
-cp .env.example .env        # 키는 나중에 채워도 된다. 샘플 격자 도시로 바로 동작
-docker compose up --build   # db(PostGIS) · engine(8001) · backend(8000) · frontend(5173, vite dev)
+cp .env.example .env         # 1. 값 채우기 (비워 둔 비밀값은 bootstrap 이 만들어 준다)
+python scripts/doctor.py     # 2. 무엇이 들어왔고 무엇이 빠졌는지 표로 확인
+scripts/bootstrap.sh         # 3. 개발용 기동 (docker-compose.yml)  → http://localhost:5173 , 관리자 /admin
 ```
 
-- http://localhost:5173 서비스, http://localhost:5173/admin 관리자 (`.env` 의 `ADMIN_PASSWORD`)
-- 코드 폴더가 컨테이너에 마운트돼 수정이 바로 반영된다 (`--reload`, vite dev).
-- 부산 실데이터: `data/raw/south-korea-latest.osm.pbf` 를 받은 뒤
-  `docker compose --profile pipeline run --rm pipeline` → `.env` 의 `GRAPH_SOURCE=postgis_memory` → `docker compose restart engine`.
-  버스까지 넣으려면 먼저 `bims_fetch` 로 `data/build/bims` 를 만든다 ([docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) 8번).
+- 운영 서버는 `scripts/bootstrap.sh --prod` 한 줄. `SITE_ADDRESS=https://도메인` 이면 Caddy 가 인증서를 자동 발급한다 → [docs/DEPLOY.md](docs/DEPLOY.md)
+- 부산 실데이터: `data/raw/south-korea-latest.osm.pbf` 를 두면 bootstrap 이 파이프라인을 돌리고, 엔진(`GRAPH_SOURCE=auto`)이 PostGIS 그래프를 자동으로 고른다.
+  수동은 `docker compose --profile pipeline run --rm pipeline && docker compose restart engine`.
+- 관리자 대시보드 상단 **설정 상태** 카드가 빠진 키·데이터와 축소 동작 중인 기능을 보여 준다.
+- 필요한 키 목록과 발급 절차: [docs/CHECKLIST.md](docs/CHECKLIST.md), [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
 
-CI(GitHub Actions)는 push 마다 엔진(PostGIS 포함)·백엔드·프론트 테스트와 `docker compose config` 를 돌린다.
+CI(GitHub Actions)는 push 마다 엔진(PostGIS 포함)·백엔드·프론트 테스트, Playwright E2E, 개발·운영 compose 검증을 돌린다.
 
 ## 로컬 실행 (컨테이너 없이)
 
 ```bash
-# 엔진 (합성 그래프)
+# 루트 .env 의 DATABASE_URL 호스트를 db → localhost 로 바꾸면 세 서비스가 같은 파일을 읽는다
+# 엔진 (GRAPH_SOURCE=auto: PostGIS 그래프 → data/build 번들 → 샘플 격자)
 cd engine && pip install -r requirements-dev.txt
-GRAPH_SOURCE=file uvicorn app.main:app --port 8001
+uvicorn app.main:app --port 8001
 # 백엔드 (PostgreSQL 필요, 테이블은 시작 시 자동 생성)
 cd backend && pip install -r requirements-dev.txt
 DATABASE_URL=postgresql+asyncpg://pathfinder:pathfinder_dev@localhost:5432/pathfinder ENGINE_URL=http://localhost:8001 \
   uvicorn app.main:app --port 8000
 curl -X POST localhost:8000/api/route -H 'content-type: application/json' \
   -d '{"origin":{"lat":35.15,"lng":129.06},"destination":{"lat":35.1536,"lng":129.0726},"profile":"wheelchair"}'
-# 프론트엔드 (vite dev 서버가 /api 를 8000 으로 프록시)
-cd frontend && npm install && cp .env.example .env   # VITE_VWORLD_KEY 입력 (없으면 OpenFreeMap OSM 배경)
+# 프론트엔드 (vite dev 서버가 /api 를 8000 으로 프록시, 루트 .env 의 VITE_VWORLD_KEY 를 읽는다)
+cd frontend && npm install
 npm run dev                                          # http://localhost:5173
 ```
 

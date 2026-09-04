@@ -65,7 +65,7 @@ MapLibre `GeolocateControl` 이 브라우저 Geolocation API 로 위치를 받�
 ## 환경변수
 
 ```
-# frontend/.env
+# 루트 .env (frontend/.env 도 가능, 같은 키는 그쪽이 우선)
 VITE_VWORLD_KEY=            # 비우면 OpenFreeMap
 VITE_BASEMAP_STYLE_URL=     # 선택
 ```
