@@ -14,7 +14,7 @@ from .config import Settings, settings
 from .database import Database
 from .reports import router as reports_router
 from .routers import router
-from .services import engine_client
+from .services import engine_client, setup
 from .services.alerts import start_alerts
 from .services.cache import SearchCache
 from .services.maintenance import start_retention
@@ -54,7 +54,8 @@ def create_app(config: Settings | None = None) -> FastAPI:
     async def health(request: Request):
         engine = await engine_client.health(request.app.state.settings)
         observability.ENGINE_UP.set(1 if engine.get("status") == "ok" else 0)
-        return {"status": "ok", "service": "backend", "engine": engine, "request_id": getattr(request.state, "request_id", "")}
+        features = setup.summarize(setup.setup_items(request.app.state.settings, engine))
+        return {"status": "ok", "service": "backend", "engine": engine, "features": features, "request_id": getattr(request.state, "request_id", "")}
 
     return app
 

@@ -8,10 +8,15 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini backend/docker-entrypoint.sh ./
 # 로컬 장소 색인(지하철역·버스정류장)
 COPY data/subway ./data/subway
 COPY data/bus ./data/bus
 ENV DATA_DIR=/app/data
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
+# RUN_MIGRATIONS=true 면 시작 전에 alembic upgrade head (운영 compose 기본). 개발은 create_all 로도 충분하다
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -5,7 +5,7 @@
 #
 # 코드 폴더를 컨테이너에 마운트하고 --reload / vite dev 로 띄우므로 수정이 바로 반영된다.
 # 부산 실데이터 적재:  docker compose --profile pipeline run --rm pipeline  (data/raw/south-korea-latest.osm.pbf 필요)
-# 그 뒤 .env 의 GRAPH_SOURCE=postgis_memory 로 바꾸고  docker compose restart engine
+# 그 뒤  docker compose restart engine  (GRAPH_SOURCE=auto 가 PostGIS 그래프를 찾아 자동으로 쓴다)
 
 name: pathfinder
 
@@ -32,15 +32,17 @@ services:
       dockerfile: engine/Dockerfile
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
     environment:
-      GRAPH_SOURCE: ${GRAPH_SOURCE:-file}
+      GRAPH_SOURCE: ${GRAPH_SOURCE:-auto}
       GRAPH_BUNDLE_PATH: /app/data/samples/grid_city.npz
       BUILDINGS_PATH: /app/data/samples/grid_city_buildings.json
+      GRAPH_BUILD_DIR: /app/data/build
       DATABASE_URL: postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD:-pathfinder_dev}@db:5432/${POSTGRES_DB:-pathfinder}
       ENGINE_TIME_BUDGET_S: ${ENGINE_TIME_BUDGET_S:-2.5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - ./engine/app:/app/app
       - ./data/samples:/app/data/samples
+      - ./data/build:/app/data/build:ro
     ports:
       - "8001:8001"
     depends_on:

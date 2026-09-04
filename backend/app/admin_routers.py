@@ -33,7 +33,7 @@ from .models import (
 )
 from .reports import KIND_LABELS, report_out
 from .services import admin_stats as stats
-from .services import alerts, engine_client
+from .services import alerts, engine_client, setup
 from .services.maintenance import log_counts, prune_logs
 from .services.personalization import Policy
 
@@ -524,6 +524,15 @@ async def data_quality(request: Request, cfg: Settings = Depends(get_settings), 
     active = int((await db.execute(select(func.count(EdgeOverride.id)).where(EdgeOverride.active.is_(True)))).scalar_one() or 0)
     cache = getattr(request.app.state, "search_cache", None)
     return {"graph": graph, "reports": report_counts, "active_overrides": active, "search_cache": (cache.stats() if cache else None)}
+
+
+# ---------------------------------------------------------------- 설정 상태
+@guarded.get("/setup", summary="설정 상태: 들어온 키·데이터와 축소 동작 중인 기능")
+async def setup_status(cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    engine = await engine_client.health(cfg)
+    alert = await alerts.load_settings(db, cfg)
+    items = setup.setup_items(cfg, engine, alert_webhook=bool(alert.get("webhook_url")))
+    return {"items": items, "summary": setup.summarize(items), "engine": engine}
 
 
 # ---------------------------------------------------------------- 알림 (웹훅·임계)

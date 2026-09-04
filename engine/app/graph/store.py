@@ -106,6 +106,9 @@ class MemoryGraphStore:
             "nodes": self.graph.num_nodes,
             "edges": self.graph.num_edges,
             "buildings": len(self.buildings),
+            # 운영자 화면용: 샘플 격자 도시인지, auto 모드가 왜 이 소스를 골랐는지
+            "sample": "samples" in str(self.source).replace("\\", "/"),
+            "resolved_from": getattr(self, "resolved_from", ""),
         }
 
 

@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY engine/app ./app
 COPY data/samples ./data/samples
 
-ENV GRAPH_SOURCE=file GRAPH_BUNDLE_PATH=/app/data/samples/grid_city.npz BUILDINGS_PATH=/app/data/samples/grid_city_buildings.json
+ENV GRAPH_SOURCE=auto GRAPH_BUNDLE_PATH=/app/data/samples/grid_city.npz BUILDINGS_PATH=/app/data/samples/grid_city_buildings.json GRAPH_BUILD_DIR=/app/data/build
 
 EXPOSE 8001
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
