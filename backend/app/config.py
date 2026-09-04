@@ -3,11 +3,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_JWT_SECRET = "change-me-in-production"
+
+
+def async_postgres_url(url: str) -> str:
+    """루트 .env 하나를 엔진(psycopg)과 같이 쓰므로 `postgresql://` 도 받아 asyncpg 형식으로 맞춘다. SQLite 는 그대로."""
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql+psycopg://"):
+        url = "postgresql://" + url[len("postgresql+psycopg://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    return url
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # 루트 .env(모든 서비스 공용) 를 먼저 읽고, backend/.env 가 있으면 그 값이 우선한다
+    model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
 
     app_env: str = "dev"
     database_url: str = "postgresql+asyncpg://pathfinder:pathfinder_dev@db:5432/pathfinder"
@@ -29,7 +44,7 @@ class Settings(BaseSettings):
     kakao_client_secret: str = ""                         # 선택 (보안 > Client Secret)
     naver_client_id: str = ""
     naver_client_secret: str = ""
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = DEFAULT_JWT_SECRET
     session_days: int = 30
     cookie_secure: bool = False
     allow_dev_login: bool = False                         # true 면 /api/auth/dev/login 으로 데모 사용자 로그인 (로컬 전용)
@@ -53,6 +68,11 @@ class Settings(BaseSettings):
     alert_webhook_url: str = ""                           # 비어 있으면 알림 끔 (화면에서 넣을 수도 있음)
     alert_enabled: bool = True
     alert_interval_min: int = 5                           # 평가 주기
+
+    @field_validator("database_url")
+    @classmethod
+    def _async_url(cls, v: str) -> str:
+        return async_postgres_url(v)
 
     @property
     def cors_origin_list(self) -> list[str]:

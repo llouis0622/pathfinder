@@ -1,7 +1,48 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { fetchOverview } from '../api'
+import { fetchOverview, fetchSetup, type SetupItem } from '../api'
 import { LineChart, ShareBar, StatTile, fmtMs, fmtNum, fmtPct, shortDates } from '../charts'
 import { Card, HttpStatus, KIND_LABEL, Loading, Rank, Status, Table, UserChip, fmtDateTime, profileLabel, useFetch } from '../ui'
+
+const LEVEL_LABEL: Record<SetupItem['level'], string> = { required: '필수', recommended: '권장', optional: '선택' }
+const STATUS_LABEL: Record<SetupItem['status'], string> = { ok: '준비됨', degraded: '축소 동작', missing: '없음' }
+const GUIDE_BASE = 'https://github.com/llouis0622/pathfinder/blob/main/'
+
+/** 키·데이터가 얼마나 들어왔는지. 프론트 빌드에 들어간 VWorld 키는 서버가 모르니 여기서 덧붙인다. */
+export function SetupCard() {
+  const { data, loading, error } = useFetch(fetchSetup, [])
+  const vworld = !!import.meta.env.VITE_VWORLD_KEY || !!import.meta.env.VITE_BASEMAP_STYLE_URL
+  const items: SetupItem[] = data ? [...data.items, {
+    key: 'basemap', label: '배경 지도 (VWorld)', level: 'recommended', status: vworld ? 'ok' : 'degraded', env: 'VITE_VWORLD_KEY',
+    detail: vworld ? '프론트 빌드에 키가 들어 있어요' : 'OpenFreeMap(OSM) 배경으로 동작 — 국내 건물·주소 상세도가 낮아요', guide: 'docs/SETUP_GUIDE.md#5-vworld-인증키-강력-권장-배경-지도--건물-높이',
+  }] : []
+  const attention = items.filter((i) => i.status !== 'ok')
+  const summary = data?.summary
+  return (
+    <Card title="설정 상태" actions={summary && (
+      <span className={`adm-status adm-status--${summary.ready_for_production && attention.length === 0 ? 'ok' : summary.runnable ? 'warn' : 'error'}`}>
+        {summary.ready_for_production && attention.length === 0 ? '모두 준비됨' : summary.runnable ? `${attention.length}개 항목 확인 필요` : '필수 항목 없음'}
+      </span>
+    )}>
+      <Loading loading={loading} error={error}>
+        {data && attention.length === 0 && <div className="adm-muted">필수·권장·선택 항목이 모두 채워져 있어요.</div>}
+        {data && attention.length > 0 && (
+          <Table head={['구분', '항목', '상태', '내용', '변수']} className="adm-table--compact">
+            {attention.map((i) => (
+              <tr key={i.key}>
+                <td><span className={`adm-status${i.level === 'required' ? ' adm-status--error' : ''}`}>{LEVEL_LABEL[i.level]}</span></td>
+                <td><b>{i.label}</b></td>
+                <td><span className={`adm-status adm-status--${i.status === 'missing' ? 'error' : 'warn'}`}>{STATUS_LABEL[i.status]}</span></td>
+                <td className="wrap">{i.detail}{i.guide && <> · <a className="adm-link" href={GUIDE_BASE + i.guide} target="_blank" rel="noreferrer">가이드</a></>}</td>
+                <td className="adm-mono">{i.env}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+        {data && <p className="adm-muted" style={{ marginTop: 10 }}>루트 <code>.env</code> 에 값을 넣고 서비스를 재시작하면 반영돼요. 터미널에서는 <code>python scripts/doctor.py</code> 로 같은 점검을 할 수 있어요.</p>}
+      </Loading>
+    </Card>
+  )
+}
 
 export default function Dashboard() {
   const { data, loading, error } = useFetch(fetchOverview, [])
@@ -10,6 +51,7 @@ export default function Dashboard() {
     <Loading loading={loading} error={error}>
       {data && (
         <>
+          <SetupCard />
           <div className="adm-grid adm-grid--tiles">
             <StatTile label="오늘 검색" value={fmtNum(data.kpis.requests_today)} sub={`7일 ${fmtNum(data.kpis.requests_7d)} · 누적 ${fmtNum(data.kpis.requests_total)}`} />
             <StatTile label="활성 사용자 (7일)" value={fmtNum(data.kpis.active_users_7d)} sub={`전체 ${fmtNum(data.kpis.users_total)} · 신규 ${fmtNum(data.kpis.users_new_7d)}`} />

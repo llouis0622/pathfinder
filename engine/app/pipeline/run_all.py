@@ -15,6 +15,7 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
+from ..config import plain_postgres_url
 from ..features.elevation import DEFAULT_DEM, Dem
 from ..graph.model import Graph
 from ..graph.store import load_buildings_json, save_buildings_json
@@ -27,14 +28,19 @@ from .build_walk_graph import build_from_pbf as build_walk
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pathfinder 그래프 빌드")
-    parser.add_argument("--pbf", type=Path, help="Geofabrik south-korea-latest.osm.pbf (생략 시 <out>/walk.npz 재사용)")
+    default_pbf = Path("../data/raw/south-korea-latest.osm.pbf")
+    parser.add_argument("--pbf", type=Path, default=(default_pbf if default_pbf.is_file() else None),
+                        help="Geofabrik south-korea-latest.osm.pbf (기본: ../data/raw 에 있으면 사용, 없으면 <out>/walk.npz 재사용)")
     parser.add_argument("--boundary", type=Path, default=DEFAULT_BOUNDARY)
     parser.add_argument("--unramped", type=Path, default=DEFAULT_UNRAMPED)
     parser.add_argument("--dem", type=Path, default=DEFAULT_DEM)
     parser.add_argument("--gtfs", type=Path, default=None)
-    parser.add_argument("--bims-cache", type=Path, default=None)
+    default_bims = Path("../data/build/bims")
+    parser.add_argument("--bims-cache", type=Path, default=(default_bims if default_bims.is_dir() else None),
+                        help="bims_fetch 결과 폴더 (기본: ../data/build/bims 가 있으면 사용)")
     parser.add_argument("--out", type=Path, default=Path("../data/build"))
-    parser.add_argument("--postgis", default="", help="적재할 PostGIS DSN (생략 시 번들만 생성)")
+    parser.add_argument("--postgis", default=plain_postgres_url(os.environ.get("DATABASE_URL", "")),
+                        help="적재할 PostGIS DSN (기본: 환경변수 DATABASE_URL, 비우면 번들만 생성)")
     parser.add_argument("--skip-subway", action="store_true")
     parser.add_argument("--skip-buildings", action="store_true")
     parser.add_argument("--no-compact", action="store_true")

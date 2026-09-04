@@ -37,6 +37,7 @@ describe('admin app', () => {
         return body.password === 'pw' ? json({ admin: true }) : json({ detail: '비밀번호가 올바르지 않습니다' }, 401)
       }
       if (url === '/api/admin/overview') return json(OVERVIEW)
+      if (url === '/api/admin/setup') return json({ items: [{ key: 'jwt', label: 'JWT 비밀키', level: 'required', status: 'missing', detail: '기본값', env: 'JWT_SECRET', guide: 'docs/SETUP_GUIDE.md' }], summary: { ready_for_production: false, runnable: false, missing: ['jwt'], degraded: [], counts: { ok: 0, degraded: 0, missing: 1 } }, engine: { status: 'ok' } })
       return json({ detail: `unexpected ${url}` }, 404)
     })
     render(<MemoryRouter initialEntries={['/admin']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>)
@@ -48,6 +49,8 @@ describe('admin app', () => {
     fireEvent.click(screen.getByRole('button', { name: '로그인' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('대시보드'))
     expect(await screen.findByText('오늘 검색')).toBeInTheDocument()
+    expect(await screen.findByText('필수 항목 없음')).toBeInTheDocument()
+    expect(screen.getByText('JWT 비밀키')).toBeInTheDocument()
     expect(screen.getByText('서면역 → 하단역')).toBeInTheDocument()
     expect(screen.getByText('2순위')).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/admin/overview')).toBe(true)

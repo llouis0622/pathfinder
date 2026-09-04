@@ -30,7 +30,7 @@ def create_app(store: GraphStore | None = None, config: Settings | None = None) 
     async def lifespan(app: FastAPI):
         app.state.settings = cfg
         app.state.store = store or build_store(
-            cfg.graph_source, bundle_path=cfg.graph_bundle_path, buildings_path=cfg.buildings_path, dsn=cfg.database_url,
+            cfg.graph_source, bundle_path=cfg.graph_bundle_path, buildings_path=cfg.buildings_path, dsn=cfg.database_url, build_dir=cfg.graph_build_dir,
         )
         app.state.tile_cache = tiles.TileCache(cfg.tile_cache_size)
         log.info("그래프 스토어 준비: %s", app.state.store.describe())

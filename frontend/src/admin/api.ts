@@ -189,3 +189,8 @@ export const saveAlertSettings = (patch: Partial<Omit<AlertSettings, 'rules'>> &
 export const testAlert = () => call<AlertEventRow>('/api/admin/alerts/test', { method: 'POST' })
 export const evaluateAlerts = () => call<{ findings: AlertFinding[]; sent: AlertEventRow[]; enabled: boolean; webhook_configured: boolean }>('/api/admin/alerts/evaluate', { method: 'POST' })
 export const fetchAlertEvents = (params: Record<string, string | number | undefined>) => call<Paged<AlertEventRow> & { rule_labels: Record<string, string> }>(`/api/admin/alerts/events${qs(params)}`)
+
+// ---------------------------------------------------------------- 설정 상태 (키·데이터 준비 상황)
+export type SetupItem = { key: string; label: string; level: 'required' | 'recommended' | 'optional'; status: 'ok' | 'degraded' | 'missing'; detail: string; env: string; guide: string }
+export type SetupStatus = { items: SetupItem[]; summary: { ready_for_production: boolean; runnable: boolean; missing: string[]; degraded: string[]; counts: Record<string, number> }; engine: { status: string } }
+export const fetchSetup = () => call<SetupStatus>('/api/admin/setup')
