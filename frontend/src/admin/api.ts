@@ -194,3 +194,9 @@ export const fetchAlertEvents = (params: Record<string, string | number | undefi
 export type SetupItem = { key: string; label: string; level: 'required' | 'recommended' | 'optional'; status: 'ok' | 'degraded' | 'missing'; detail: string; env: string; guide: string }
 export type SetupStatus = { items: SetupItem[]; summary: { ready_for_production: boolean; runnable: boolean; missing: string[]; degraded: string[]; counts: Record<string, number> }; engine: { status: string } }
 export const fetchSetup = () => call<SetupStatus>('/api/admin/setup')
+
+// ---------------------------------------------------------------- 요청 한도·동시성
+export type Limits = { route_per_minute: number; engine_concurrency: number; engine_queue_timeout_s: number }
+export type LimitsStatus = { limits: Limits; stats: { route_rejected: number; engine_inflight: number; engine_rejected: number }; defaults: Limits }
+export const fetchLimits = () => call<LimitsStatus>('/api/admin/limits')
+export const saveLimits = (patch: Partial<Limits>) => call<LimitsStatus>('/api/admin/limits', { method: 'PUT', body: JSON.stringify(patch) })

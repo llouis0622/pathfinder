@@ -79,7 +79,7 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
         weather=weather.model_dump(), options={**req.options.model_dump(), "prefer_shade": req.prefer_shade},
     )
     key = search_key((req.origin.lat, req.origin.lng), (req.destination.lat, req.destination.lng), req.profile, req.prefer_shade,
-                     departure_at, weather.flags, req.options.k)
+                     departure_at, weather.flags, req.options.k, req.options.time_budget_s, req.options.seed)
     cached = False
     result = cache.get(key) if cache is not None else None
     if result is not None:

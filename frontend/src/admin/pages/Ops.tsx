@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   acceptReport, createOverride, deactivateOverride, evaluateAlerts, fetchAlertEvents, fetchAlertSettings, fetchDataQuality, fetchOverrides,
-  fetchReports, rejectReport, saveAlertSettings, testAlert, type AlertFinding, type AlertRule, type AlertSettings, type GraphStats, type ReportRow,
+  fetchLimits, fetchReports, rejectReport, saveAlertSettings, saveLimits, testAlert, type AlertFinding, type AlertRule, type AlertSettings, type GraphStats, type Limits, type ReportRow,
 } from '../api'
 import { RankBars, ShareBar, StatTile, fmtNum, fmtPct } from '../charts'
 import { Card, Empty, Filters, Input, Loading, Pager, Select, Table, UserChip, fmtDateTime, useFetch } from '../ui'
@@ -216,6 +216,37 @@ export function ReportsPage() {
   )
 }
 
+// ---------------------------------------------------------------- 요청 한도·동시성
+export function LimitsCard() {
+  const { data, loading, error, reload } = useFetch(fetchLimits, [])
+  const [form, setForm] = useState<Partial<Limits>>({})
+  const [msg, setMsg] = useState<string | null>(null)
+  const cur: Limits | null = data ? { ...data.limits, ...form } : null
+  const save = async () => {
+    if (!cur) return
+    try { await saveLimits(cur); setForm({}); setMsg('저장했어요 (바로 적용)'); reload() } catch (e) { setMsg(e instanceof Error ? e.message : '저장하지 못했어요') }
+  }
+  return (
+    <Card title="요청 한도·엔진 동시성" actions={data && <span className="adm-muted">거절 · 검색 {fmtNum(data.stats.route_rejected)} · 엔진 혼잡 {fmtNum(data.stats.engine_rejected)} · 진행 중 {fmtNum(data.stats.engine_inflight)}</span>}>
+      <Loading loading={loading} error={error}>
+        {cur && (
+          <>
+            <p className="adm-muted" style={{ marginBottom: 10 }}>무료 공개 서비스에서 한 IP 가 검색을 쏟아붓거나, 검색이 몰려 엔진이 과부하되는 것을 막아요. 한도를 넘으면 429, 엔진 자리가 안 나면 503 을 돌려주고 프론트가 안내 문구를 보여 줘요.</p>
+            <div className="adm-inline">
+              <Input label="IP 당 분당 검색 (0 = 제한 없음)" type="number" value={String(cur.route_per_minute)} onChange={(v) => setForm({ ...form, route_per_minute: Number(v) })} />
+              <Input label="엔진 동시 탐색 수" type="number" value={String(cur.engine_concurrency)} onChange={(v) => setForm({ ...form, engine_concurrency: Number(v) })} />
+              <Input label="대기 시간 (초)" type="number" value={String(cur.engine_queue_timeout_s)} onChange={(v) => setForm({ ...form, engine_queue_timeout_s: Number(v) })} />
+              <button type="button" className="adm-btn adm-btn--primary" disabled={Object.keys(form).length === 0} onClick={save}>한도 저장</button>
+              {msg && <span className="adm-muted" role="status">{msg}</span>}
+            </div>
+            <p className="adm-muted">환경변수 기본값: 분당 {data?.defaults.route_per_minute} · 동시 {data?.defaults.engine_concurrency} · 대기 {data?.defaults.engine_queue_timeout_s}초. 엔진 쪽에도 같은 보호(<code>MAX_CONCURRENT_SEARCHES</code>)가 있어요.</p>
+          </>
+        )}
+      </Loading>
+    </Card>
+  )
+}
+
 // ---------------------------------------------------------------- 알림
 const RULE_HELP: Record<string, { unit: string; help: string }> = {
   engine_down: { unit: '', help: '엔진 /health 가 200 이 아니면' },
@@ -304,6 +335,7 @@ export function AlertsPage() {
               </Table>
             </Card>
           </div>
+          <LimitsCard />
           <Card title="알림 이력" actions={<button type="button" className="adm-btn adm-btn--ghost" onClick={events.reload}>새로고침</button>}>
             <Loading loading={events.loading} error={events.error}>
               {events.data && events.data.items.length === 0 && <Empty text="아직 보낸 알림이 없어요" />}

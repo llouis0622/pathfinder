@@ -18,6 +18,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/CHECKLIST.md](docs/CHECKLIST.md) | 발급받을 API 키와 확보할 데이터 체크리스트 |
 | [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | 키 발급 절차와 기입 위치를 항목별로 적은 상세 가이드 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 운영 배포: prod compose, Caddy 자동 HTTPS, 백업, 마이그레이션, 업데이트 |
+| [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 이력 (현재 v0.1.0) |
 
 ## 진행 상태
 
@@ -82,7 +83,7 @@ cd ../frontend && npm install && npm run typecheck && npm test        # vitest +
 scripts/e2e_up.sh start && (cd frontend && npx playwright install chromium && npm run e2e); scripts/e2e_up.sh stop
 ```
 
-CI(`.github/workflows/ci.yml`)는 엔진·백엔드·프론트 단위 테스트에 더해 같은 E2E 를 돌리고, 실패하면 Playwright 리포트를 아티팩트로 남긴다.
+CI(`.github/workflows/ci.yml`)는 엔진·백엔드·프론트 단위 테스트, 파이프라인 의존성(pandas·rasterio·geopandas)을 설치한 엔진 파이프라인 테스트, 같은 E2E 를 돌리고, 실패하면 Playwright 리포트를 아티팩트로 남긴다.
 
 ## 프론트엔드 구성
 

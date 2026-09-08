@@ -29,7 +29,7 @@ test.describe('제보 → 관리자 검토 → 데이터 품질·알림', () => 
     await expect(page.getByText('경사 정보 커버리지')).toBeVisible()
     await expect(page.getByText('보행망 연결성')).toBeVisible()
 
-    await page.getByRole('link', { name: '알림', exact: true }).click()
+    await page.getByRole('link', { name: '알림·한도', exact: true }).click()
     await page.getByRole('button', { name: '지금 평가' }).click()
     await expect(page.getByRole('status')).toContainText(/정상|임계/)
   })

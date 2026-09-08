@@ -34,6 +34,7 @@ from .models import (
 from .reports import KIND_LABELS, report_out
 from .services import admin_stats as stats
 from .services import alerts, engine_client, setup
+from .services import limits as limits_svc
 from .services.maintenance import log_counts, prune_logs
 from .services.personalization import Policy
 
@@ -533,6 +534,27 @@ async def setup_status(cfg: Settings = Depends(get_settings), db: AsyncSession =
     alert = await alerts.load_settings(db, cfg)
     items = setup.setup_items(cfg, engine, alert_webhook=bool(alert.get("webhook_url")))
     return {"items": items, "summary": setup.summarize(items), "engine": engine}
+
+
+# ---------------------------------------------------------------- 요청 한도·동시성
+class LimitsBody(BaseModel):
+    route_per_minute: int | None = Field(default=None, ge=0, le=10000)
+    engine_concurrency: int | None = Field(default=None, ge=1, le=64)
+    engine_queue_timeout_s: float | None = Field(default=None, ge=0.5, le=60)
+
+
+@guarded.get("/limits", summary="요청 한도(IP 당 분당 검색)·엔진 동시성과 현재 상태")
+async def limits_get(request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    return {"limits": await limits_svc.load_limits(db, cfg), "stats": limits_svc.stats(request.app), "defaults": limits_svc.defaults(cfg)}
+
+
+@guarded.put("/limits", summary="요청 한도·동시성 저장 (즉시 적용)")
+async def limits_put(body: LimitsBody, request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
+    patch = body.model_dump(exclude_none=True)
+    saved = await limits_svc.save_limits(db, cfg, patch)
+    limits_svc.apply(request.app, saved)
+    audit.mark(request, "admin", "limits:" + ",".join(f"{k}={v}" for k, v in patch.items()))
+    return {"limits": saved, "stats": limits_svc.stats(request.app), "defaults": limits_svc.defaults(cfg)}
 
 
 # ---------------------------------------------------------------- 알림 (웹훅·임계)

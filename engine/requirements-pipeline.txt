@@ -1,3 +1,6 @@
+# 실데이터 빌드용. pyrosm 은 빌드 의존성(pyrobuf)이 setuptools 70 이상에서 깨지므로 설치가 실패하면
+#   pip install 'setuptools<70' && pip install --no-build-isolation pyrosm==0.6.2
+# 로 먼저 넣는다. (CI 는 requirements-pipeline-ci.txt 로 pyrosm 없이 테스트한다)
 -r requirements.txt
 pyrosm==0.6.2
 osmnx==2.0.1

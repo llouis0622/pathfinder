@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from . import tiles
-from .api.routes import router
+from .api.routes import SearchGate, router
 from .config import Settings, settings
 from .graph.factory import build_store
 from .graph.store import GraphStore
@@ -33,6 +33,7 @@ def create_app(store: GraphStore | None = None, config: Settings | None = None) 
             cfg.graph_source, bundle_path=cfg.graph_bundle_path, buildings_path=cfg.buildings_path, dsn=cfg.database_url, build_dir=cfg.graph_build_dir,
         )
         app.state.tile_cache = tiles.TileCache(cfg.tile_cache_size)
+        app.state.search_gate = SearchGate(cfg.max_concurrent_searches, cfg.search_queue_timeout_s)
         log.info("그래프 스토어 준비: %s", app.state.store.describe())
         yield
 

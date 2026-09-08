@@ -13,10 +13,10 @@ BUCKET_MIN = 30
 
 
 def search_key(origin: tuple[float, float], destination: tuple[float, float], profile: str, prefer_shade: bool, departure_at: datetime,
-               weather_flags: list[str], k: int) -> tuple:
+               weather_flags: list[str], k: int, time_budget_s: float | None = None, seed: int | None = None) -> tuple:
     bucket = departure_at.replace(minute=(departure_at.minute // BUCKET_MIN) * BUCKET_MIN, second=0, microsecond=0)
     return (round(origin[0], 5), round(origin[1], 5), round(destination[0], 5), round(destination[1], 5), profile, bool(prefer_shade),
-            bucket.isoformat(), tuple(sorted(weather_flags)), int(k))
+            bucket.isoformat(), tuple(sorted(weather_flags)), int(k), time_budget_s, seed)
 
 
 class SearchCache:

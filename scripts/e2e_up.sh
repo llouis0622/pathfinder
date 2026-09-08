@@ -15,7 +15,7 @@ start() {
       ALLOW_DEV_LOGIN=true JWT_SECRET=e2e-secret-not-for-production-0123456789 ALERT_ENABLED=false LOG_RETENTION_DAYS=0 WEATHER_PROVIDER=none KAKAO_REST_API_KEY= \
       nohup "$PY" -m uvicorn app.main:app --port 8000 > "$RUN/backend.log" 2>&1 & echo $! > "$RUN/backend.pid" )
   for i in $(seq 1 60); do
-    if curl -fsS http://127.0.0.1:8001/health >/dev/null 2>&1 && curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+    if curl -fsS -m 3 --noproxy "*" http://127.0.0.1:8001/health >/dev/null 2>&1 && curl -fsS -m 5 --noproxy "*" http://127.0.0.1:8000/health >/dev/null 2>&1; then
       echo "engine + backend ready"; return 0
     fi
     sleep 1

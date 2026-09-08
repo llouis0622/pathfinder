@@ -112,7 +112,7 @@ async def create_report(body: ReportIn, request: Request, cfg: Settings = Depend
     await db.refresh(r)
     audit.mark(request, "api", f"report:{body.kind}", (user.id if user else None))
     return ReportOut(id=str(r.id), status=r.status, kind=r.kind, kind_label=KIND_LABELS[r.kind],
-                     created_at=(r.created_at or datetime.now(timezone.utc)).isoformat())
+                     created_at=((r.created_at.replace(tzinfo=timezone.utc) if r.created_at and r.created_at.tzinfo is None else r.created_at) or datetime.now(timezone.utc)).isoformat())
 
 
 @router.get("/reports/mine", summary="내 제보 (로그인 사용자)")

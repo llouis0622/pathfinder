@@ -16,6 +16,7 @@ from .database import Database
 from .reports import router as reports_router
 from .routers import router
 from .services import engine_client, setup
+from .services import limits as limits_svc
 from .services.alerts import start_alerts
 from .services.cache import SearchCache
 from .services.maintenance import start_retention
@@ -34,6 +35,8 @@ def create_app(config: Settings | None = None) -> FastAPI:
         app.state.search_cache = SearchCache(cfg.search_cache_ttl_s, cfg.search_cache_size)
         await app.state.db.create_all()
         log.info("DB 준비 (%s)", cfg.database_url.split("@")[-1])
+        async for session in app.state.db.session():
+            limits_svc.apply(app, await limits_svc.load_limits(session, cfg))
         if cfg.jwt_secret_weak:
             log.warning("JWT_SECRET 이 자리표시자이거나 32자 미만입니다. 관리자 기능이 꺼지고, 공개 주소에서는 로그인이 막힙니다 (openssl rand -base64 48)")
         retention = start_retention(app)

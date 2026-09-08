@@ -8,8 +8,14 @@ export default function A11yMenu({ settings, onChange }: { settings: A11ySetting
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      ref.current?.querySelector<HTMLButtonElement>('button')?.focus()   // 포커스를 연 버튼으로 되돌린다
+    }
     document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', onKey) }
   }, [open])
   const on = settings.largeText || settings.highContrast || settings.voice
   return (
