@@ -18,6 +18,7 @@ OSM 보행망 + 지하철 + 버스를 하나의 그래프로 만들고, 날씨·
 | [docs/CHECKLIST.md](docs/CHECKLIST.md) | 발급받을 API 키와 확보할 데이터 체크리스트 |
 | [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | 키 발급 절차와 기입 위치를 항목별로 적은 상세 가이드 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 운영 배포: prod compose, Caddy 자동 HTTPS, 백업, 마이그레이션, 업데이트 |
+| [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 이력 (현재 v0.1.0) |
 
 ## 진행 상태
 
