@@ -1,0 +1,10 @@
+# CI 의 engine-pipeline 잡용: 파이프라인 테스트가 실제로 쓰는 의존성만. pyrosm/osmnx 는 OSM PBF 를 읽을 때만 필요하고
+# 최신 setuptools 에서 pyrosm 의 빌드 의존성(pyrobuf)이 깨지므로 여기서는 뺀다 (실제 빌드는 requirements-pipeline.txt).
+-r requirements.txt
+geopandas==1.0.1
+pyproj==3.7.0
+rasterio==1.4.3
+pandas==2.2.3
+pyarrow==18.1.0
+httpx==0.28.1
+tqdm==4.67.1
