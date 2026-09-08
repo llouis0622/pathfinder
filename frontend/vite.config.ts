@@ -8,6 +8,7 @@ import { defineConfig } from 'vite'
 function loadRootEnv(): void {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
   if (!env) return
+  const fromShell = new Set(Object.keys(env))   // 셸·compose 가 준 값이 파일보다 우선
   for (const file of [resolve(__dirname, '..', '.env'), resolve(__dirname, '.env')]) {
     if (!existsSync(file)) continue
     for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
@@ -18,6 +19,7 @@ function loadRootEnv(): void {
       const key = line.slice(0, eq).trim()
       if (!key.startsWith('VITE_')) continue
       const value = line.slice(eq + 1).trim().replace(/^(["'])(.*)\1$/, '$2')
+      if (fromShell.has(key)) continue
       if (file === resolve(__dirname, '.env') || env[key] === undefined) env[key] = value
     }
   }
@@ -30,6 +32,7 @@ const proxyTarget = (globalThis as { process?: { env?: Record<string, string | u
 
 export default defineConfig({
   plugins: [react()],
+  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   server: {
     host: true,
     port: 5173,

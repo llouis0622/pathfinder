@@ -37,12 +37,34 @@ def test_setup_items_flag_missing_and_degraded():
 
 def test_health_and_admin_setup_endpoint(external):
     admin.reset_failures()
-    cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", admin_password="secret-pw", _env_file=None)
+    cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", admin_password="secret-pw", jwt_secret="t" * 40, _env_file=None)
     with TestClient(create_app(cfg)) as c:
         h = c.get("/health").json()
-        assert h["features"]["runnable"] is False and "jwt" in h["features"]["missing"] and "admin" not in h["features"]["missing"]
+        assert h["features"]["runnable"] is True and "missing" not in h["features"] and h["features"]["counts"]["missing"] >= 1   # 로그인 공급자 없음
         r = c.post("/api/admin/login", json={"password": "secret-pw"})
         c.cookies.set("pf_admin", r.cookies["pf_admin"])
         s = c.get("/api/admin/setup").json()
         keys = [i["key"] for i in s["items"]]
         assert "alerts" in keys and s["summary"]["counts"]["ok"] >= 2
+
+
+def test_weak_jwt_disables_admin_and_public_login(external):
+    admin.reset_failures()
+    weak = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", admin_password="secret-pw", allow_dev_login=True,
+                    jwt_secret="change-me-to-a-long-random-string", public_base_url="https://pf.example.com", _env_file=None)
+    with TestClient(create_app(weak)) as c:
+        assert c.get("/api/admin/me").json() == {"configured": False, "admin": False, "reason": "jwt_secret"}
+        assert c.post("/api/admin/login", json={"password": "secret-pw"}).status_code == 404
+        assert c.post("/api/auth/dev/login").status_code == 503          # 공개 주소 + 약한 키 → 로그인 거부
+    local = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", allow_dev_login=True, jwt_secret="short", _env_file=None)
+    with TestClient(create_app(local)) as c:
+        assert c.post("/api/auth/dev/login").status_code == 200          # localhost 개발은 허용
+
+
+def test_forwarded_for_uses_last_hop(external):
+    from fastapi import Request
+
+    from app import audit
+
+    scope = {"type": "http", "headers": [(b"x-forwarded-for", b"1.1.1.1, 203.0.113.9")], "client": ("10.0.0.2", 1), "method": "GET", "path": "/", "query_string": b""}
+    assert audit.client_ip(Request(scope)) == "203.0.113.9"

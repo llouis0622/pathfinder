@@ -7,6 +7,7 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_JWT_SECRET = "change-me-in-production"
+PLACEHOLDER_SECRETS = {DEFAULT_JWT_SECRET, "change-me-to-a-long-random-string", "ci-only-secret-0123456789abcdefghijklmnopqrstuv"}
 
 
 def async_postgres_url(url: str) -> str:
@@ -73,6 +74,20 @@ class Settings(BaseSettings):
     @classmethod
     def _async_url(cls, v: str) -> str:
         return async_postgres_url(v)
+
+    @property
+    def jwt_secret_weak(self) -> bool:
+        """자리표시자·짧은 비밀키. 이 상태에서는 관리자 기능을 끄고, 공개 주소에서는 로그인도 막는다."""
+        return self.jwt_secret in PLACEHOLDER_SECRETS or len(self.jwt_secret) < 32
+
+    @property
+    def is_local(self) -> bool:
+        return any(h in self.public_base_url for h in ("localhost", "127.0.0.1"))
+
+    @property
+    def cookie_secure_effective(self) -> bool:
+        """COOKIE_SECURE 를 켜지 않아도 공개 주소가 https 면 Secure 쿠키를 쓴다."""
+        return self.cookie_secure or self.public_base_url.startswith("https://")
 
     @property
     def cors_origin_list(self) -> list[str]:

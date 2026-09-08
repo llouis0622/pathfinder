@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createReport, fetchReportKinds } from '../api'
 
 export type ReportTarget = { lat: number; lng: number; placeName?: string; requestId?: string; defaultKind?: string }
@@ -16,12 +16,16 @@ export default function ReportDialog({ target, onClose, onDone }: { target: Repo
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const boxRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => { fetchReportKinds().then((k) => k.length && setKinds(k)).catch(() => undefined) }, [])
+  // 열릴 때 첫 컨트롤로 포커스, 닫힐 때 원래 자리로 복원 (스크린리더·키보드 사용자)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    const previous = document.activeElement as HTMLElement | null
+    const first = boxRef.current?.querySelector<HTMLElement>('[role="radio"], textarea, button')
+    first?.focus()
+    return () => { previous?.focus?.() }
+  }, [])
 
   const submit = async () => {
     setBusy(true)
@@ -39,7 +43,8 @@ export default function ReportDialog({ target, onClose, onDone }: { target: Repo
 
   return (
     <div className="modal" role="presentation" onClick={onClose}>
-      <div className="modal__box" role="dialog" aria-modal="true" aria-labelledby="report-title" onClick={(e) => e.stopPropagation()}>
+      <div ref={boxRef} className="modal__box" role="dialog" aria-modal="true" aria-labelledby="report-title" onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }}>
         <h2 id="report-title" className="modal__title">시설 제보</h2>
         <p className="modal__sub">{target.placeName ? `${target.placeName} 근처` : '이 위치'}의 문제를 알려 주세요. 확인되면 다른 분들 경로에도 바로 반영돼요.</p>
         <div className="modal__kinds" role="radiogroup" aria-label="제보 종류">

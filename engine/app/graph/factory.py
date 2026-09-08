@@ -51,6 +51,12 @@ def build_store(source: str, *, bundle_path: str = "", buildings_path: str = "",
     if source == "auto":
         source, bundle_path, buildings_path, resolved_from = resolve_auto(bundle_path=bundle_path, buildings_path=buildings_path, dsn=dsn, build_dir=build_dir)
         log.warning("GRAPH_SOURCE=auto → %s (%s)", source, resolved_from)
+        if source == "postgis_memory":
+            try:
+                return build_store("postgis_memory", bundle_path=bundle_path, buildings_path=buildings_path, dsn=dsn, build_dir=build_dir)
+            except Exception as exc:  # noqa: BLE001  — 적재 도중 실패(스키마 불일치·DB 재시작)면 번들로 내려간다
+                log.exception("PostGIS 적재 실패 → 파일 번들로 폴백: %s", exc)
+                source, bundle_path, buildings_path, resolved_from = resolve_auto(bundle_path=bundle_path, buildings_path=buildings_path, dsn="", build_dir=build_dir)
     if source == "file":
         if not Path(bundle_path).is_file():
             raise FileNotFoundError(f"그래프 번들이 없습니다: {bundle_path}")

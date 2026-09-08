@@ -62,7 +62,11 @@ def create_app(store: GraphStore | None = None, config: Settings | None = None) 
         store_obj: GraphStore | None = getattr(request.app.state, "store", None)
         if store_obj is None:
             raise HTTPException(status_code=503, detail="그래프 스토어가 준비되지 않았습니다.")
-        return {"status": "ok", "service": "engine", "graph": store_obj.describe()}
+        try:
+            graph = store_obj.describe()
+        except Exception as exc:  # noqa: BLE001  — postgis 모드에서 DB 가 죽으면 503 으로 알린다
+            raise HTTPException(status_code=503, detail=f"그래프 스토어 응답 없음: {type(exc).__name__}") from exc
+        return {"status": "ok", "service": "engine", "graph": graph}
 
     @app.get("/api/snap", summary="좌표를 가장 가까운 보행 노드에 스냅")
     def snap(request: Request, lat: float = Query(..., ge=-90, le=90), lng: float = Query(..., ge=-180, le=180),

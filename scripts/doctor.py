@@ -19,7 +19,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_JWT = "change-me-in-production"
+PLACEHOLDER_JWT = {"change-me-in-production", "change-me-to-a-long-random-string"}
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -93,8 +93,8 @@ def run(env: dict[str, str]) -> list[dict]:
     st, detail = check_db(g("DATABASE_URL", ""))
     add("database", "PostgreSQL + PostGIS", "required", st, detail, "DATABASE_URL")
     jwt = g("JWT_SECRET", "")
-    add("jwt", "JWT 비밀키", "required", "missing" if (not jwt or jwt == DEFAULT_JWT or len(jwt) < 32) else "ok",
-        "비어 있거나 기본값/32자 미만 → openssl rand -base64 48" if (not jwt or jwt == DEFAULT_JWT or len(jwt) < 32) else "설정됨", "JWT_SECRET")
+    add("jwt", "JWT 비밀키", "required", "missing" if (not jwt or jwt in PLACEHOLDER_JWT or len(jwt) < 32) else "ok",
+        "비어 있거나 자리표시자/32자 미만 → openssl rand -base64 48" if (not jwt or jwt in PLACEHOLDER_JWT or len(jwt) < 32) else "설정됨", "JWT_SECRET")
     add("admin", "관리자 비밀번호", "required", "ok" if g("ADMIN_PASSWORD") else "missing", "설정됨" if g("ADMIN_PASSWORD") else "비어 있으면 /admin 이 꺼진다", "ADMIN_PASSWORD")
     pbf = next(iter((ROOT / "data" / "raw").glob("*.osm.pbf")), None) if (ROOT / "data" / "raw").is_dir() else None
     bundle = ROOT / "data" / "build" / "graph_bundle.npz"

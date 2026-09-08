@@ -46,7 +46,9 @@ export default function AdminApp() {
       <div className="adm-login">
         <div className="adm-login__box">
           <h1>관리자 기능이 꺼져 있어요</h1>
-          <p>백엔드 환경변수 <code>ADMIN_PASSWORD</code> 를 설정하면 관리자 페이지가 열립니다.</p>
+          {me.reason === 'jwt_secret'
+            ? <p>루트 <code>.env</code> 의 <code>JWT_SECRET</code> 이 자리표시자이거나 32자 미만이에요. 이 상태로는 관리자 세션을 누구나 위조할 수 있어 잠가 둡니다. <code>openssl rand -base64 48</code> 로 만든 값을 넣고 다시 시작하세요.</p>
+            : <p>루트 <code>.env</code> 의 <code>ADMIN_PASSWORD</code> 를 설정하면 관리자 페이지가 열립니다.</p>}
           <Link className="adm-btn" to="/">서비스로 돌아가기</Link>
         </div>
       </div>

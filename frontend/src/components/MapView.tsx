@@ -181,10 +181,15 @@ export default function MapView({ origin, destination, routes, selectedId, overl
       }
     }
     const schedule = () => { window.clearTimeout(timer); timer = window.setTimeout(refresh, 250) }
+    // 경로 소스 갱신·타일 하나하나가 아니라 그래프 타일 소스가 다 실렸을 때만 다시 계산한다
+    const onSourceData = (e: maplibregl.MapSourceDataEvent) => { if (e.sourceId === GRAPH_SOURCE && e.isSourceLoaded) schedule() }
+    // 시각이 바뀌면 이전에 칠한 값은 지워 두고 새로 받는다
+    shadedIdsRef.current.forEach((id) => map.setFeatureState({ source: GRAPH_SOURCE, sourceLayer: 'edges', id: Number(id) }, { shade: null }))
+    shadedIdsRef.current.clear()
     map.on('moveend', schedule)
-    map.on('sourcedata', schedule)
+    map.on('sourcedata', onSourceData)
     schedule()
-    return () => { window.clearTimeout(timer); map.off('moveend', schedule); map.off('sourcedata', schedule); shadeAbortRef.current?.abort() }
+    return () => { window.clearTimeout(timer); map.off('moveend', schedule); map.off('sourcedata', onSourceData); shadeAbortRef.current?.abort() }
   }, [overlay, ready, departureAt])
 
   if (failed) {

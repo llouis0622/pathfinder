@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config import DEFAULT_JWT_SECRET, Settings
+from ..config import Settings
 
 GUIDE = "docs/SETUP_GUIDE.md"
 
@@ -36,9 +36,9 @@ def setup_items(cfg: Settings, engine: dict[str, Any] | None = None, alert_webho
             src = (graph or {}).get("source", "")
             items.append(_item("graph", "부산 그래프 데이터", "required", "ok", f"{src} · {(graph or {}).get('resolved_from') or '실데이터'}", "GRAPH_SOURCE"))
 
-    weak_jwt = cfg.jwt_secret == DEFAULT_JWT_SECRET or len(cfg.jwt_secret) < 32
+    weak_jwt = cfg.jwt_secret_weak
     items.append(_item("jwt", "JWT 비밀키", "required", "missing" if weak_jwt else "ok",
-                       "기본값이거나 32자 미만 — 세션 위조 가능, 운영 전 반드시 교체" if weak_jwt else "설정됨", "JWT_SECRET", f"{GUIDE}#2-jwt-비밀키-필수"))
+                       "자리표시자이거나 32자 미만 — 관리자 기능이 꺼지고 공개 주소에서는 로그인이 막혀요. openssl rand -base64 48" if weak_jwt else "설정됨", "JWT_SECRET", f"{GUIDE}#2-jwt-비밀키-필수"))
     items.append(_item("admin", "관리자 비밀번호", "required", "ok" if cfg.admin_password else "missing",
                        "설정됨" if cfg.admin_password else "비어 있어 관리자 페이지가 꺼져 있어요", "ADMIN_PASSWORD", f"{GUIDE}#3-관리자-비밀번호-필수"))
 

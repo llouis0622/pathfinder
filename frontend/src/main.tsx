@@ -27,5 +27,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 // PWA: 배포 빌드에서만 서비스 워커를 등록한다 (개발 서버에서는 HMR 과 충돌)
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => undefined) })
+  // 빌드마다 URL 이 달라져 새 서비스 워커가 설치되고, 이전 캐시는 activate 때 지워진다
+  window.addEventListener('load', () => { navigator.serviceWorker.register(`/sw.js?v=${__BUILD_ID__}`).catch(() => undefined) })
 }

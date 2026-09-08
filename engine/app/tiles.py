@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import math
+import threading
 from collections import OrderedDict
 from datetime import datetime
 from typing import Any
@@ -21,7 +22,7 @@ import mapbox_vector_tile
 import numpy as np
 from shapely.geometry import LineString, Point
 
-from .features.shade import edge_shade_ratios
+from .features.shade import BUILDING_MARGIN_DEG, edge_shade_ratios
 from .graph.geo import haversine_m
 from .graph.model import TRI_TRUE, Graph
 from .graph.store import MemoryGraphStore
@@ -33,7 +34,7 @@ SHOWN_EDGE_KINDS = ("walk", "link", "vertical")
 STOP_NODE_KINDS = ("stop", "platform", "entrance")
 KERB_TYPES = ("raised", "rolled")
 SHADE_MAX_SPAN_M = 3500.0            # 그늘 계산 bbox 한 변 상한
-SHADE_BUILDING_MARGIN_DEG = 0.003    # 건물 그림자가 밖에서 들어오므로 bbox 를 ~300m 넓혀 건물을 읽는다
+SHADE_BUILDING_MARGIN_DEG = BUILDING_MARGIN_DEG    # 건물 그림자가 밖에서 들어오므로 bbox 를 ~300m 넓혀 건물을 읽는다
 R = 6378137.0
 
 MVT_MEDIA_TYPE = "application/vnd.mapbox-vector-tile"
@@ -142,11 +143,17 @@ class _EdgeIndex:
         return np.flatnonzero((self.max_lat >= min_lat) & (self.min_lat <= max_lat) & (self.max_lng >= min_lng) & (self.min_lng <= max_lng))
 
 
+_INDEX_LOCK = threading.Lock()
+
+
 def edge_index(store: MemoryGraphStore) -> _EdgeIndex:
     idx = getattr(store, "_tile_index", None)
     if idx is None:
-        idx = _EdgeIndex(store.graph)
-        store._tile_index = idx  # type: ignore[attr-defined]
+        with _INDEX_LOCK:   # 첫 타일 요청이 동시에 여러 개 와도 인덱스는 한 번만 만든다
+            idx = getattr(store, "_tile_index", None)
+            if idx is None:
+                idx = _EdgeIndex(store.graph)
+                store._tile_index = idx  # type: ignore[attr-defined]
     return idx
 
 
@@ -302,40 +309,47 @@ class TileCache:
     def __init__(self, maxsize: int = 4096) -> None:
         self.maxsize = int(maxsize)
         self._items: OrderedDict[tuple[int, int, int], bytes] = OrderedDict()
+        self._lock = threading.Lock()      # 타일 엔드포인트는 스레드풀에서 동시에 돈다
         self.hits = 0
         self.misses = 0
 
     def get(self, key: tuple[int, int, int]) -> bytes | None:
-        if key in self._items:
-            self._items.move_to_end(key)
-            self.hits += 1
-            return self._items[key]
-        self.misses += 1
-        return None
+        with self._lock:
+            if key in self._items:
+                self._items.move_to_end(key)
+                self.hits += 1
+                return self._items[key]
+            self.misses += 1
+            return None
 
     def put(self, key: tuple[int, int, int], value: bytes) -> None:
         if self.maxsize <= 0:
             return
-        self._items[key] = value
-        self._items.move_to_end(key)
-        while len(self._items) > self.maxsize:
-            self._items.popitem(last=False)
+        with self._lock:
+            self._items[key] = value
+            self._items.move_to_end(key)
+            while len(self._items) > self.maxsize:
+                self._items.popitem(last=False)
 
     def clear(self) -> None:
-        self._items.clear()
+        with self._lock:
+            self._items.clear()
 
     def stats(self) -> dict[str, Any]:
-        return {"maxsize": self.maxsize, "size": len(self._items), "hits": self.hits, "misses": self.misses,
-                "bytes": sum(len(v) for v in self._items.values())}
+        with self._lock:
+            return {"maxsize": self.maxsize, "size": len(self._items), "hits": self.hits, "misses": self.misses,
+                    "bytes": sum(len(v) for v in self._items.values())}
 
 
-def render_tile_cached(store: Any, cache: TileCache, z: int, x: int, y: int) -> bytes:
+def render_tile_cached(store: Any, cache: TileCache, z: int, x: int, y: int) -> tuple[bytes, bool]:
+    """(타일 바이트, 캐시 적중 여부)."""
     key = (z, x, y)
     data = cache.get(key)
-    if data is None:
-        data = render_tile(store, z, x, y)
-        cache.put(key, data)
-    return data
+    if data is not None:
+        return data, True
+    data = render_tile(store, z, x, y)
+    cache.put(key, data)
+    return data, False
 
 
 # ---------------------------------------------------------------- 가장 가까운 엣지 (시설 제보 위치 → 엣지)

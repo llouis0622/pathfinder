@@ -118,8 +118,10 @@ def load_buildings_json(path: str | Path) -> list[Building]:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     out: list[Building] = []
     for i, b in enumerate(data.get("buildings", data if isinstance(data, list) else [])):
-        fp = [(float(p[0]), float(p[1])) for p in b["footprint"]]
-        holes = [[(float(p[0]), float(p[1])) for p in ring] for ring in b.get("holes", [])]
+        fp = [(float(p[0]), float(p[1])) for p in b.get("footprint", [])]
+        if len(fp) < 3:
+            continue   # 점 1~2개짜리 외곽은 다각형이 안 된다 (PostGIS 적재기와 같은 규칙)
+        holes = [[(float(p[0]), float(p[1])) for p in ring] for ring in b.get("holes", []) if len(ring) >= 3]
         h = b.get("height_m")
         out.append(Building(id=int(b.get("id", i)), height_m=(float(h) if h is not None else None), footprint=fp, holes=holes))
     return out

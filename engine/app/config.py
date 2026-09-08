@@ -1,8 +1,27 @@
 """엔진 설정 (환경변수)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ENGINE_DIR = Path(__file__).resolve().parents[1]      # .../engine
+REPO_DIR = ENGINE_DIR.parent
+
+
+def resolve_path(value: str) -> str:
+    """상대 경로는 작업 폴더와 상관없이 engine/ 기준, 없으면 레포 루트 기준으로 찾는다 (.env 는 루트에 있고 서버는 engine/ 에서 뜬다)."""
+    if not value:
+        return value
+    p = Path(value)
+    if p.is_absolute():
+        return str(p)
+    for base in (ENGINE_DIR, REPO_DIR, Path.cwd()):
+        cand = (base / p).resolve()
+        if cand.exists():
+            return str(cand)
+    return str((ENGINE_DIR / p).resolve())
 
 
 def plain_postgres_url(url: str) -> str:
@@ -33,6 +52,11 @@ class Settings(BaseSettings):
     @classmethod
     def _plain(cls, v: str) -> str:
         return plain_postgres_url(v)
+
+    @field_validator("graph_bundle_path", "buildings_path", "graph_build_dir")
+    @classmethod
+    def _paths(cls, v: str) -> str:
+        return resolve_path(v)
 
 
 settings = Settings()

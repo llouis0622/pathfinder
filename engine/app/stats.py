@@ -1,6 +1,7 @@
 """그래프 데이터 품질 통계 (관리자 데이터 품질 대시보드용). 한 번 계산해 캐시한다."""
 from __future__ import annotations
 
+import threading
 from collections import Counter
 from typing import Any
 
@@ -71,10 +72,21 @@ def graph_stats(graph: Graph, buildings: list[Building]) -> dict[str, Any]:
     }
 
 
+_STATS_LOCK = threading.Lock()
+
+
 def store_stats(store: Any) -> dict[str, Any]:
     cached = getattr(store, "_stats_cache", None)
     if cached is not None:
         return cached
+    with _STATS_LOCK:
+        cached = getattr(store, "_stats_cache", None)
+        if cached is not None:
+            return cached
+        return _compute_store_stats(store)
+
+
+def _compute_store_stats(store: Any) -> dict[str, Any]:
     if isinstance(store, MemoryGraphStore):
         result = graph_stats(store.graph, store.buildings)
     else:

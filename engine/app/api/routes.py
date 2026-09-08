@@ -80,10 +80,9 @@ def tile(request: Request, z: int, x: int, y: int) -> Response:
     if not tiles.valid_tile(z, x, y):
         raise HTTPException(status_code=404, detail="타일 좌표가 올바르지 않습니다")
     cache = request.app.state.tile_cache
-    before = cache.hits
-    data = tiles.render_tile_cached(request.app.state.store, cache, z, x, y)
-    TILES.labels("hit" if cache.hits > before else ("empty" if not data else "miss")).inc()
-    headers = {"Cache-Control": "public, max-age=3600", "X-Tile-Cache": "hit" if cache.hits > before else "miss"}
+    data, hit = tiles.render_tile_cached(request.app.state.store, cache, z, x, y)
+    TILES.labels("hit" if hit else ("empty" if not data else "miss")).inc()
+    headers = {"Cache-Control": "public, max-age=3600", "X-Tile-Cache": "hit" if hit else "miss"}
     if not data:
         return Response(status_code=204, headers=headers)
     return Response(content=data, media_type=tiles.MVT_MEDIA_TYPE, headers=headers)

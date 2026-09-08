@@ -23,7 +23,7 @@ const qs = (params: Record<string, string | number | boolean | undefined | null>
 }
 
 // ---------------------------------------------------------------- 타입
-export type AdminMe = { configured: boolean; admin: boolean }
+export type AdminMe = { configured: boolean; admin: boolean; reason?: string }
 export type Paged<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 export type UserRef = { id: string; provider: string; nickname: string; avatar_url: string; created_at: string | null; last_login_at: string | null }
 export type RequestRow = {

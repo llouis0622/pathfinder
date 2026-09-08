@@ -83,6 +83,9 @@ def build_route(
             L = float(e["length_m"][idx])
             g = e["grade_pct"][idx]
             g_val = None if np.isnan(g) else float(g)
+            mg = e["max_grade_pct"][idx] if "max_grade_pct" in e else np.nan
+            # 비용 모델이 보는 최대 경사(DEM 표본 중 최대)와 같은 값을 사용자에게 보여 준다
+            steepest = max(abs(g_val) if g_val is not None else 0.0, 0.0 if np.isnan(mg) else abs(float(mg)))
             _append_path(walk.path, pts)
             walk.distance += L
             walk.duration += t
@@ -93,8 +96,8 @@ def build_route(
                     walk.uphill += dz
                 else:
                     walk.downhill -= dz
-                if walk.max_grade is None or abs(g_val) > walk.max_grade:
-                    walk.max_grade = abs(g_val)
+                if walk.max_grade is None or steepest > walk.max_grade:
+                    walk.max_grade = steepest
             is_stairs = e["stairs"][idx] == TRI_TRUE
             if is_stairs:
                 walk.stairs += 1

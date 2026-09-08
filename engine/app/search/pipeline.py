@@ -10,7 +10,7 @@ import numpy as np
 from ..cost.model import compute_costs, route_cost
 from ..cost.profiles import get_profile
 from ..cost.weather import WeatherContext
-from ..features.shade import edge_shade_ratios
+from ..features.shade import BUILDING_MARGIN_DEG, edge_shade_ratios
 from ..features.solar import KST
 from ..graph.corridor import CorridorSpec
 from ..graph.store import GraphStore, SnapError
@@ -72,7 +72,9 @@ def search_routes(
 
     # 3. 그늘 (출발 시각이 없으면 지금)
     departure_at = request.departure_at or datetime.now(KST)
-    buildings = store.buildings_in(spec.bbox(spec.walk_axis_m))
+    b0, b1, b2, b3 = spec.bbox(spec.walk_axis_m)
+    m = BUILDING_MARGIN_DEG   # 타일 그늘과 같은 여백 → 경로 shade_ratio 와 지도 그늘이 일치한다
+    buildings = store.buildings_in((b0 - m, b1 - m, b2 + m, b3 + m))
     shade, shade_info = edge_shade_ratios(sub, buildings, departure_at)
 
     # 3b. 시설 제보 오버라이드 (회랑 배열은 요청마다 새로 만들어지므로 제자리 수정해도 안전)

@@ -99,7 +99,7 @@ class LoginBody(BaseModel):
 
 @router.get("/me", summary="관리자 세션 상태")
 async def admin_me(request: Request, cfg: Settings = Depends(get_settings)) -> dict:
-    return {"configured": admin.enabled(cfg), "admin": admin.is_admin(request)}
+    return {"configured": admin.enabled(cfg), "admin": admin.is_admin(request), "reason": admin.disabled_reason(cfg)}
 
 
 @router.post("/login", summary="관리자 로그인 (ADMIN_PASSWORD)")
@@ -536,6 +536,12 @@ async def setup_status(cfg: Settings = Depends(get_settings), db: AsyncSession =
 
 
 # ---------------------------------------------------------------- 알림 (웹훅·임계)
+class AlertRuleBody(BaseModel):
+    enabled: bool = True
+    threshold: float | None = Field(default=None, ge=0)
+    min_samples: int | None = Field(default=None, ge=1, le=100000)
+
+
 class AlertSettingsBody(BaseModel):
     enabled: bool | None = None
     webhook_url: str | None = Field(default=None, max_length=500)
@@ -543,7 +549,7 @@ class AlertSettingsBody(BaseModel):
     interval_min: int | None = Field(default=None, ge=1, le=1440)
     window_min: int | None = Field(default=None, ge=5, le=1440)
     cooldown_min: int | None = Field(default=None, ge=0, le=10080)
-    rules: dict[str, dict[str, Any]] | None = None
+    rules: dict[str, AlertRuleBody] | None = None
 
 
 @guarded.get("/alerts/settings", summary="알림 설정 (웹훅·주기·임계)")
@@ -553,7 +559,9 @@ async def alert_settings(cfg: Settings = Depends(get_settings), db: AsyncSession
 
 @guarded.put("/alerts/settings", summary="알림 설정 저장 (보낸 필드만 바뀐다)")
 async def alert_settings_save(body: AlertSettingsBody, request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> dict:
-    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    patch = {k: v for k, v in body.model_dump(exclude_none=True).items()}
+    if "rules" in patch:
+        patch["rules"] = {k: {kk: vv for kk, vv in r.items() if vv is not None} for k, r in patch["rules"].items()}
     if "webhook_url" in patch and patch["webhook_url"] and not patch["webhook_url"].startswith(("http://", "https://")):
         raise HTTPException(status_code=422, detail="웹훅 URL 은 http(s):// 로 시작해야 합니다")
     if "rules" in patch:

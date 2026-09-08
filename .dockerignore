@@ -1,0 +1,24 @@
+# Docker 빌드 컨텍스트에서 뺄 것 (모든 Dockerfile 이 레포 루트를 컨텍스트로 쓴다)
+.git
+.github
+.env
+.env.*
+!.env.example
+**/.env
+**/node_modules
+**/dist
+**/.vite
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.venv
+**/venv
+frontend/playwright-report
+frontend/test-results
+.e2e
+backups
+# 대용량 원천·산출물은 볼륨으로 마운트한다 (data/samples 만 이미지에 들어간다)
+data/raw
+data/build
+*.osm.pbf
+*.log

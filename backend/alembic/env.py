@@ -23,7 +23,7 @@ from app.database import Base
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))   # configparser 보간 이스케이프
 
 target_metadata = Base.metadata
 
