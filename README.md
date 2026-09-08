@@ -82,7 +82,7 @@ cd ../frontend && npm install && npm run typecheck && npm test        # vitest +
 scripts/e2e_up.sh start && (cd frontend && npx playwright install chromium && npm run e2e); scripts/e2e_up.sh stop
 ```
 
-CI(`.github/workflows/ci.yml`)는 엔진·백엔드·프론트 단위 테스트에 더해 같은 E2E 를 돌리고, 실패하면 Playwright 리포트를 아티팩트로 남긴다.
+CI(`.github/workflows/ci.yml`)는 엔진·백엔드·프론트 단위 테스트, 파이프라인 의존성(pandas·rasterio·geopandas)을 설치한 엔진 파이프라인 테스트, 같은 E2E 를 돌리고, 실패하면 Playwright 리포트를 아티팩트로 남긴다.
 
 ## 프론트엔드 구성
 

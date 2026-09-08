@@ -55,6 +55,7 @@ describe('ops pages', () => {
       if (url === '/api/admin/alerts/settings' && init?.method === 'PUT') { bodies.push(JSON.parse(String(init.body))); return json({ ...SETTINGS, webhook_configured: true, webhook_url_masked: 'https://hooks.slack.com/servi…' }) }
       if (url === '/api/admin/alerts/settings') return json(SETTINGS)
       if (url.startsWith('/api/admin/alerts/events')) return json({ items: [], total: 0, page: 1, size: 30, pages: 1, rule_labels: {} })
+      if (url === '/api/admin/limits') return json({ limits: { route_per_minute: 30, engine_concurrency: 4, engine_queue_timeout_s: 8 }, stats: { route_rejected: 0, engine_inflight: 0, engine_rejected: 0 }, defaults: { route_per_minute: 30, engine_concurrency: 4, engine_queue_timeout_s: 8 } })
       if (url === '/api/admin/alerts/evaluate') return json({ findings: [{ rule: 'error_rate', value: 50, threshold: 10, message: '검색 오류율 50%' }], sent: [], enabled: true, webhook_configured: false })
       return json({ detail: `unexpected ${url}` }, 404)
     })

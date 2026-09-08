@@ -20,7 +20,7 @@ const NAV: { group: string; items: { to: string; label: string; end?: boolean }[
   { group: '분석', items: [
     { to: '/admin/analytics/usage', label: '이용 추이' }, { to: '/admin/analytics/quality', label: '경로 품질' }, { to: '/admin/analytics/spatial', label: '공간 분석' },
   ] },
-  { group: '운영', items: [{ to: '/admin/data-quality', label: '데이터 품질' }, { to: '/admin/reports', label: '제보 검토' }, { to: '/admin/alerts', label: '알림' }] },
+  { group: '운영', items: [{ to: '/admin/data-quality', label: '데이터 품질' }, { to: '/admin/reports', label: '제보 검토' }, { to: '/admin/alerts', label: '알림·한도' }] },
 ]
 
 const TITLES: [RegExp, string][] = [
@@ -28,7 +28,7 @@ const TITLES: [RegExp, string][] = [
   [/^\/admin\/logs\/access/, '접근·인증 로그'], [/^\/admin\/logs\/engine/, '엔진 성능 로그'], [/^\/admin\/logs\/choices/, '경로 선택 로그'],
   [/^\/admin\/logs\/places/, '장소 검색 로그'], [/^\/admin\/users\/.+/, '사용자 상세'], [/^\/admin\/users/, '사용자'],
   [/^\/admin\/preferences/, '취향 분포'], [/^\/admin\/analytics\/usage/, '이용 추이'], [/^\/admin\/analytics\/quality/, '경로 품질'],
-  [/^\/admin\/analytics\/spatial/, '공간 분석'], [/^\/admin\/data-quality/, '데이터 품질'], [/^\/admin\/reports/, '제보 검토·오버라이드'], [/^\/admin\/alerts/, '알림 설정'],
+  [/^\/admin\/analytics\/spatial/, '공간 분석'], [/^\/admin\/data-quality/, '데이터 품질'], [/^\/admin\/reports/, '제보 검토·오버라이드'], [/^\/admin\/alerts/, '알림·요청 한도'],
 ]
 
 export default function AdminApp() {

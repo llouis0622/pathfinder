@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     search_cache_ttl_s: int = 600                         # 같은 출발·도착·프로필·시간대 검색 결과 재사용 (0 = 끔)
     search_cache_size: int = 500
     report_rate_limit_per_hour: int = 20                  # IP 당 시설 제보 한도
+    route_rate_limit_per_minute: int = 30                 # IP 당 분당 경로 검색 한도 (0 = 끔). 관리자 화면 값이 우선
+    engine_concurrency: int = 4                           # 엔진으로 동시에 보내는 탐색 수
+    engine_queue_timeout_s: float = 8.0                   # 자리가 날 때까지 기다리는 시간, 넘기면 503
     # ---- 알림 (Slack 수신 웹훅 또는 JSON 웹훅). 관리자 화면에서 바꾼 값이 우선한다 ----
     alert_webhook_url: str = ""                           # 비어 있으면 알림 끔 (화면에서 넣을 수도 있음)
     alert_enabled: bool = True

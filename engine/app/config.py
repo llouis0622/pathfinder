@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     graph_build_dir: str = "../data/build"                 # run_all 산출물 (graph_bundle.npz, buildings.json)
     database_url: str = "postgresql://pathfinder:pathfinder_dev@db:5432/pathfinder"
     engine_time_budget_s: float = 2.5
+    max_concurrent_searches: int = 4        # 동시에 도는 탐색 수. 넘치면 search_queue_timeout_s 만큼 기다렸다가 503
+    search_queue_timeout_s: float = 5.0
     aco_ants: int = 24
     aco_iterations: int = 60
     ga_generations: int = 25

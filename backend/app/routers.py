@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import audit, auth
 from .config import Settings
 from .models import PlaceSearch, RouteRequest, User, UserPlace
+from .observability import ROUTE_SEARCHES
 from .schemas import (
     ChooseRequest,
     ChooseResponse,
@@ -121,10 +122,22 @@ async def shade(min_lat: float = Query(..., ge=-90, le=90), min_lng: float = Que
 @router.post("/route", response_model=RouteSearchResponse, summary="교통약자 맞춤 경로 Top 3 (로그인 시 개인화 재정렬)")
 async def route(req: RouteSearchRequest, request: Request, cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db),
                 user: User | None = Depends(get_user)) -> RouteSearchResponse:
+    limiter = getattr(request.app.state, "rate_limiter", None)
+    ip = audit.client_ip(request)
+    if limiter is not None and not limiter.allow(ip):
+        ROUTE_SEARCHES.labels(req.profile, "rate_limited", "false").inc()
+        raise HTTPException(status_code=429, detail="검색이 너무 잦아요. 잠시 후 다시 시도해 주세요", headers={"Retry-After": str(limiter.retry_after(ip))})
+    gate = getattr(request.app.state, "engine_gate", None)
+    if gate is not None and not await gate.acquire():
+        ROUTE_SEARCHES.labels(req.profile, "busy", "false").inc()
+        raise HTTPException(status_code=503, detail="지금 검색이 몰려 있어요. 잠시 후 다시 시도해 주세요", headers={"Retry-After": "3"})
     try:
         return await search_and_store(cfg, db, req, user, cache=getattr(request.app.state, "search_cache", None))
     except engine_client.EngineError as exc:
         raise HTTPException(status_code=exc.status if exc.status in (422, 503) else 502, detail=exc.detail) from exc
+    finally:
+        if gate is not None:
+            gate.release()
 
 
 @router.get("/route/{request_id}", response_model=StoredRouteResponse, summary="저장된 경로 결과 조회")

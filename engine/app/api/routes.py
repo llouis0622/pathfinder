@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 from pydantic import BaseModel
 
 from .. import tiles
@@ -22,6 +22,40 @@ log = logging.getLogger("engine.api")
 router = APIRouter(prefix="/api", tags=["engine"])
 
 SEARCHES = Counter("pathfinder_engine_searches_total", "엔진 탐색 수", ["profile", "status"])
+SEARCH_INFLIGHT = Gauge("pathfinder_engine_searches_inflight", "지금 도는 탐색 수")
+
+
+class SearchGate:
+    """동시 탐색 수 제한. 탐색은 CPU 를 다 쓰므로 코어 수 안팎으로 묶고, 넘치면 잠깐 기다렸다가 503 을 돌려준다."""
+
+    def __init__(self, limit: int, timeout_s: float) -> None:
+        import threading
+
+        self.limit = max(1, int(limit))
+        self.timeout_s = float(timeout_s)
+        self._sem = threading.BoundedSemaphore(self.limit)
+        self.inflight = 0
+        self.rejected = 0
+        self._lock = threading.Lock()
+
+    def acquire(self) -> bool:
+        ok = self._sem.acquire(timeout=self.timeout_s)
+        with self._lock:
+            if ok:
+                self.inflight += 1
+                SEARCH_INFLIGHT.set(self.inflight)
+            else:
+                self.rejected += 1
+        return ok
+
+    def release(self) -> None:
+        with self._lock:
+            self.inflight = max(0, self.inflight - 1)
+            SEARCH_INFLIGHT.set(self.inflight)
+        self._sem.release()
+
+    def stats(self) -> dict:
+        return {"limit": self.limit, "inflight": self.inflight, "rejected": self.rejected, "timeout_s": self.timeout_s}
 SEARCH_SECONDS = Histogram("pathfinder_engine_search_seconds", "엔진 탐색 시간(초)", ["profile"], buckets=(0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 30))
 TILES = Counter("pathfinder_engine_tiles_total", "타일 요청", ["result"])
 
@@ -54,6 +88,10 @@ def search(request: Request, body: SearchRequest) -> SearchResponse:
         body.options.time_budget_s = cfg.engine_time_budget_s
     import time as _time
 
+    gate: SearchGate = request.app.state.search_gate
+    if not gate.acquire():
+        SEARCHES.labels(body.profile, "busy").inc()
+        raise HTTPException(status_code=503, detail="엔진이 혼잡합니다. 잠시 후 다시 시도해 주세요", headers={"Retry-After": "2"})
     started = _time.perf_counter()
     try:
         result = search_routes(request.app.state.store, body, replace(aco), replace(ga))
@@ -64,6 +102,8 @@ def search(request: Request, body: SearchRequest) -> SearchResponse:
         SEARCHES.labels(body.profile, "error").inc()
         log.exception("탐색 실패")
         raise HTTPException(status_code=500, detail=f"탐색 중 오류: {type(exc).__name__}") from exc
+    finally:
+        gate.release()
     SEARCHES.labels(body.profile, "ok").inc()
     SEARCH_SECONDS.labels(body.profile).observe(_time.perf_counter() - started)
     return result
