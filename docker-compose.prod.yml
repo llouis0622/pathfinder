@@ -68,8 +68,8 @@ services:
       PUBLIC_BASE_URL: ${SITE_ADDRESS:-http://localhost}
       FRONTEND_URL: ${SITE_ADDRESS:-http://localhost}
       CORS_ORIGINS: ${SITE_ADDRESS:-http://localhost}
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
-      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-false}
+      # 공개 주소가 https 면 백엔드가 Secure 쿠키를 자동으로 쓴다. 데모 로그인은 운영에서 항상 끈다
+      ALLOW_DEV_LOGIN: "false"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 를 .env 에 넣으세요 (openssl rand -base64 48)}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_SESSION_HOURS: ${ADMIN_SESSION_HOURS:-12}
@@ -138,7 +138,7 @@ services:
     command:
       - |
         while true; do
-          DATABASE_URL="postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pathfinder}" KEEP_DAYS="${KEEP_DAYS:-14}" /scripts/db_backup.sh /backups || echo "backup failed"
+          DATABASE_URL="postgresql://${POSTGRES_USER:-pathfinder}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pathfinder}" KEEP_DAYS="${KEEP_DAYS:-14}" bash /scripts/db_backup.sh /backups || echo "backup failed"
           sleep 86400
         done
     volumes:

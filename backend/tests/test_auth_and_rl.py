@@ -16,7 +16,7 @@ ROUTE_BODY = {
 def auth_client(external):
     cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", kakao_client_id="kakao-rest-key",
                    naver_client_id="naver-id", naver_client_secret="naver-secret", allow_dev_login=True,
-                   personalization_epsilon=0.0, jwt_secret="test-secret", frontend_url="http://front.test")
+                   personalization_epsilon=0.0, jwt_secret="test-secret-0123456789-abcdefghijklmnop", frontend_url="http://front.test")
     with TestClient(create_app(cfg), follow_redirects=False) as c:
         yield c
 

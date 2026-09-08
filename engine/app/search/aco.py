@@ -188,7 +188,6 @@ class AntColony:
                 if path is None:
                     failed += 1
                     continue
-                completed += 1
                 key = path_key(path)
                 entry = archive.get(key)
                 if entry is None:
@@ -198,6 +197,7 @@ class AntColony:
                         continue
                     entry = ArchiveEntry(c, path, "aco")
                     archive[key] = entry
+                completed += 1   # 비용이 유한한 개미만 완주로 센다 (실패와 이중 계산하지 않는다)
                 if iter_best is None or entry.cost < iter_best.cost:
                     iter_best = entry
             self._evaporate()

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import audit, auth
 from .config import Settings
-from .models import Report, User
+from .models import Report, RouteRequest, User
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
@@ -29,8 +29,14 @@ KIND_LABELS = {"elevator_broken": "엘리베이터 고장", "stairs": "계단 �
 _recent: dict[str, deque[float]] = defaultdict(deque)
 
 
+MAX_TRACKED_IPS = 5000
+
+
 def rate_limited(ip: str, limit: int, now: float | None = None) -> bool:
     now = now or time.time()
+    if len(_recent) > MAX_TRACKED_IPS:
+        for k in [k for k, dq in _recent.items() if not dq or now - dq[-1] > 3600]:
+            _recent.pop(k, None)
     q = _recent[ip]
     while q and now - q[0] > 3600:
         q.popleft()
@@ -97,6 +103,8 @@ async def create_report(body: ReportIn, request: Request, cfg: Settings = Depend
             rid = uuid.UUID(body.request_id)
         except ValueError:
             rid = None
+        if rid is not None and await db.get(RouteRequest, rid) is None:
+            rid = None   # 지워졌거나 잘못된 요청 id 는 FK 위반 대신 비워 둔다
     r = Report(user_id=(user.id if user else None), request_id=rid, lat=body.lat, lng=body.lng, kind=body.kind, note=body.note.strip(),
                place_name=body.place_name.strip(), ip=ip)
     db.add(r)

@@ -22,6 +22,8 @@ from ..graph.model import TRI_TRUE, Graph
 from ..graph.store import Building
 from .solar import round_to_bucket, solar_position
 
+BUILDING_MARGIN_DEG = 0.003    # 건물 그림자가 회랑 밖에서 들어오므로 bbox 를 ~300m 넓혀 건물을 읽는다
+
 MIN_ELEVATION_DEG = 3.0
 MAX_BUILDING_HEIGHT_M = 1000.0
 LEVEL_HEIGHT_M = 3.3
@@ -96,7 +98,10 @@ def edge_shade_ratios(graph: Graph, buildings: list[Building], moment: datetime 
         for ring in b.holes:
             hx, hy = project_local([p[0] for p in ring], [p[1] for p in ring], ref_lat, ref_lng)
             holes.append(list(zip(hx, hy)))
-        poly = Polygon(list(zip(fx, fy)), holes)
+        try:
+            poly = Polygon(list(zip(fx, fy)), holes)
+        except ValueError:
+            continue   # 점이 모자란 외곽/구멍
         if poly.is_empty or not poly.is_valid or poly.area <= 0:
             poly = poly.buffer(0)
             if poly.is_empty or poly.area <= 0:

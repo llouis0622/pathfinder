@@ -1,6 +1,7 @@
 """Pathfinder 백엔드 FastAPI 앱: 장소 검색, 날씨, 경로 오케스트레이션, 로그."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -33,12 +34,15 @@ def create_app(config: Settings | None = None) -> FastAPI:
         app.state.search_cache = SearchCache(cfg.search_cache_ttl_s, cfg.search_cache_size)
         await app.state.db.create_all()
         log.info("DB 준비 (%s)", cfg.database_url.split("@")[-1])
+        if cfg.jwt_secret_weak:
+            log.warning("JWT_SECRET 이 자리표시자이거나 32자 미만입니다. 관리자 기능이 꺼지고, 공개 주소에서는 로그인이 막힙니다 (openssl rand -base64 48)")
         retention = start_retention(app)
         alerts = start_alerts(app)
         yield
-        for task in (retention, alerts):
-            if task is not None:
-                task.cancel()
+        tasks = [t for t in (retention, alerts) if t is not None]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         await app.state.db.dispose()
 
     app = FastAPI(title="Pathfinder Backend", description="교통약자 맞춤형 경로 추천 서비스 백엔드 API", version="0.4.0", lifespan=lifespan)
@@ -54,7 +58,9 @@ def create_app(config: Settings | None = None) -> FastAPI:
     async def health(request: Request):
         engine = await engine_client.health(request.app.state.settings)
         observability.ENGINE_UP.set(1 if engine.get("status") == "ok" else 0)
-        features = setup.summarize(setup.setup_items(request.app.state.settings, engine))
+        summary = setup.summarize(setup.setup_items(request.app.state.settings, engine))
+        # 인증 없는 엔드포인트라 무엇이 빠졌는지는 말하지 않는다 (자세한 목록은 관리자 /api/admin/setup)
+        features = {"runnable": summary["runnable"], "ready_for_production": summary["ready_for_production"], "counts": summary["counts"]}
         return {"status": "ok", "service": "backend", "engine": engine, "features": features, "request_id": getattr(request.state, "request_id", "")}
 
     return app

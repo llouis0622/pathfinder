@@ -17,7 +17,7 @@ ROUTE_BODY = {"origin": {"lat": 35.15, "lng": 129.06, "name": "서면역"}, "des
 def alert_client(external):
     admin.reset_failures()
     reports.reset_rate_limits()
-    cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", admin_password="secret-pw",
+    cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", admin_password="secret-pw", jwt_secret="test-secret-0123456789-abcdefghijklmnop",
                    search_cache_ttl_s=0, alert_webhook_url="", report_rate_limit_per_hour=100)
     with TestClient(create_app(cfg)) as c:
         r = c.post("/api/admin/login", json={"password": "secret-pw"})

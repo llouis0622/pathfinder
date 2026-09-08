@@ -99,10 +99,16 @@ def parse_profile(provider: str, payload: dict[str, Any]) -> ProviderProfile:
     if provider == "kakao":
         account = payload.get("kakao_account") or {}
         profile = account.get("profile") or payload.get("properties") or {}
-        return ProviderProfile("kakao", str(payload.get("id")), str(profile.get("nickname") or "카카오 사용자"),
+        uid = payload.get("id")
+        if not uid:
+            raise HTTPException(status_code=502, detail="카카오가 사용자 id 를 주지 않았습니다")
+        return ProviderProfile("kakao", str(uid), str(profile.get("nickname") or "카카오 사용자"),
                                str(profile.get("thumbnail_image_url") or profile.get("thumbnail_image") or ""))
     resp = payload.get("response") or {}
-    return ProviderProfile("naver", str(resp.get("id")), str(resp.get("nickname") or resp.get("name") or "네이버 사용자"),
+    uid = resp.get("id")
+    if not uid:
+        raise HTTPException(status_code=502, detail="네이버가 사용자 id 를 주지 않았습니다")
+    return ProviderProfile("naver", str(uid), str(resp.get("nickname") or resp.get("name") or "네이버 사용자"),
                            str(resp.get("profile_image") or ""))
 
 
@@ -154,4 +160,10 @@ async def current_user(request: Request, db: AsyncSession) -> User | None:
 
 
 def cookie_kwargs(cfg: Settings) -> dict[str, Any]:
-    return {"httponly": True, "samesite": "lax", "secure": cfg.cookie_secure, "path": "/", "max_age": cfg.session_days * 86400}
+    return {"httponly": True, "samesite": "lax", "secure": cfg.cookie_secure_effective, "path": "/", "max_age": cfg.session_days * 86400}
+
+
+def require_strong_secret(cfg: Settings) -> None:
+    """공개 주소에서 자리표시자 JWT 비밀키로 세션을 발급하면 누구나 위조할 수 있으므로 막는다 (localhost 개발은 허용)."""
+    if cfg.jwt_secret_weak and not cfg.is_local:
+        raise HTTPException(status_code=503, detail="JWT_SECRET 이 설정되지 않아 로그인을 열 수 없습니다 (docs/SETUP_GUIDE.md 2번)")

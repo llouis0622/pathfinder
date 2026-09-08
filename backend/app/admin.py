@@ -22,7 +22,25 @@ _failures: dict[str, tuple[int, float]] = {}
 
 
 def enabled(cfg: Settings) -> bool:
-    return bool(cfg.admin_password)
+    """비밀번호가 있고 JWT 비밀키가 자리표시자가 아닐 때만. 약한 키로는 관리자 세션을 누구나 위조할 수 있다."""
+    return bool(cfg.admin_password) and not cfg.jwt_secret_weak
+
+
+def disabled_reason(cfg: Settings) -> str:
+    if not cfg.admin_password:
+        return "admin_password"
+    if cfg.jwt_secret_weak:
+        return "jwt_secret"
+    return ""
+
+
+MAX_TRACKED_IPS = 5000
+
+
+def _prune(now: float, lockout_s: int) -> None:
+    if len(_failures) > MAX_TRACKED_IPS:
+        for ip in [k for k, (_, last) in _failures.items() if now - last > lockout_s]:
+            _failures.pop(ip, None)
 
 
 def issue_session(cfg: Settings) -> str:
@@ -75,6 +93,7 @@ def check_password(cfg: Settings, ip: str, password: str, now: float | None = No
     if now - last > cfg.admin_login_lockout_s:
         count = 0
     _failures[ip] = (count + 1, now)
+    _prune(now, cfg.admin_login_lockout_s)
     return False
 
 
@@ -83,4 +102,4 @@ def reset_failures() -> None:
 
 
 def cookie_kwargs(cfg: Settings) -> dict[str, Any]:
-    return {"httponly": True, "samesite": "lax", "secure": cfg.cookie_secure, "path": "/", "max_age": cfg.admin_session_hours * 3600}
+    return {"httponly": True, "samesite": "lax", "secure": cfg.cookie_secure_effective, "path": "/", "max_age": cfg.admin_session_hours * 3600}

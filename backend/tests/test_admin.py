@@ -17,7 +17,7 @@ ROUTE_BODY = {
 def admin_client(external):
     admin.reset_failures()
     cfg = Settings(database_url="sqlite+aiosqlite:///:memory:", engine_url="http://engine:8001", allow_dev_login=True,
-                   personalization_epsilon=0.0, jwt_secret="test-secret", admin_password="secret-pw", admin_login_max_failures=3,
+                   personalization_epsilon=0.0, jwt_secret="test-secret-0123456789-abcdefghijklmnop", admin_password="secret-pw", admin_login_max_failures=3,
                    admin_login_lockout_s=60, search_cache_ttl_s=0)
     with TestClient(create_app(cfg)) as c:
         yield c
@@ -44,14 +44,14 @@ def seed(c: TestClient) -> tuple[str, str]:
 
 
 def test_admin_disabled_when_no_password(client):
-    assert client.get("/api/admin/me").json() == {"configured": False, "admin": False}
+    assert client.get("/api/admin/me").json() == {"configured": False, "admin": False, "reason": "admin_password"}
     assert client.post("/api/admin/login", json={"password": "x"}).status_code == 404
     assert client.get("/api/admin/overview").status_code == 404
 
 
 def test_admin_login_lockout_and_session(admin_client):
     c = admin_client
-    assert c.get("/api/admin/me").json() == {"configured": True, "admin": False}
+    assert c.get("/api/admin/me").json() == {"configured": True, "admin": False, "reason": ""}
     assert c.get("/api/admin/overview").status_code == 401
     for _ in range(3):
         assert c.post("/api/admin/login", json={"password": "wrong"}).status_code == 401

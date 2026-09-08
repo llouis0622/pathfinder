@@ -105,10 +105,10 @@ async def save_settings(db: AsyncSession, cfg: Settings, patch: dict) -> dict:
 
 
 def public_settings(s: dict) -> dict:
-    """웹훅 URL 은 앞부분만 보여 준다 (토큰이 들어 있다)."""
+    """웹훅 URL 에는 토큰이 들어 있으므로 응답에서 빼고 앞부분만 보여 준다."""
     url = s.get("webhook_url") or ""
     masked = url if len(url) <= 28 else url[:28] + "…"
-    return {**s, "webhook_url_masked": masked, "webhook_configured": bool(url), "rule_labels": RULE_LABELS}
+    return {**{k: v for k, v in s.items() if k != "webhook_url"}, "webhook_url_masked": masked, "webhook_configured": bool(url), "rule_labels": RULE_LABELS}
 
 
 # ---------------------------------------------------------------- 평가
@@ -264,8 +264,7 @@ async def alerts_loop(app: FastAPI) -> None:
         await asyncio.sleep(interval)
 
 
-def start_alerts(app: FastAPI) -> asyncio.Task | None:
+def start_alerts(app: FastAPI) -> asyncio.Task:
+    """루프는 항상 돌고, 켜짐 여부는 매 주기 설정(DB 값 우선, 없으면 ALERT_ENABLED)으로 판단한다. 관리자 화면에서 켜면 바로 반영된다."""
     app.state.alert_state = AlertState()
-    if not app.state.settings.alert_enabled:
-        return None
     return asyncio.create_task(alerts_loop(app))

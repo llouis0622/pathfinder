@@ -20,7 +20,13 @@ gen() { if command -v openssl >/dev/null; then openssl rand -base64 "$1" | tr -d
 grep -qE "^JWT_SECRET=(change-me-to-a-long-random-string)?$" .env && sed -i.bak "s|^JWT_SECRET=.*$|JWT_SECRET=$(gen 48 64)|" .env && rm -f .env.bak && echo "[bootstrap] JWT_SECRET 자동 생성"
 setvar ADMIN_PASSWORD "$(gen 18 20)"
 if [ "$MODE" = prod ]; then
-  grep -qE "^POSTGRES_PASSWORD=(pathfinder_dev)?$" .env && sed -i.bak "s|^POSTGRES_PASSWORD=.*$|POSTGRES_PASSWORD=$(gen 24 32)|" .env && rm -f .env.bak && echo "[bootstrap] POSTGRES_PASSWORD 자동 생성 (DATABASE_URL 은 compose 가 조합)"
+  # DB 볼륨이 이미 있으면 비밀번호를 바꾸면 안 된다 (초기화 때 정해진 값과 어긋난다)
+  if docker volume inspect pathfinder_pgdata >/dev/null 2>&1; then
+    echo "[bootstrap] 기존 DB 볼륨(pathfinder_pgdata) 발견 → POSTGRES_PASSWORD 는 그대로 둔다 (볼륨을 만들 때 쓴 값과 같아야 한다)"
+    grep -qE "^POSTGRES_PASSWORD=(pathfinder_dev)?$" .env && echo "[bootstrap] 경고: .env 의 POSTGRES_PASSWORD 가 예시값이다. 볼륨이 다른 비밀번호로 만들어졌다면 backend/engine 이 접속에 실패한다. 값을 맞추거나 볼륨을 지우고(docker volume rm pathfinder_pgdata) 다시 실행하라"
+  elif grep -qE "^POSTGRES_PASSWORD=(pathfinder_dev)?$" .env; then
+    sed -i.bak "s|^POSTGRES_PASSWORD=.*$|POSTGRES_PASSWORD=$(gen 24 32)|" .env && rm -f .env.bak && echo "[bootstrap] POSTGRES_PASSWORD 자동 생성 (DATABASE_URL 은 compose 가 조합)"
+  fi
   grep -q "^SITE_ADDRESS=" .env || printf '\n# 공개 주소. 비우면 http://<서버IP>, https://도메인 을 넣으면 Caddy 가 인증서 자동 발급\nSITE_ADDRESS=\n' >> .env
 fi
 echo "[bootstrap] 관리자 비밀번호: $(grep '^ADMIN_PASSWORD=' .env | cut -d= -f2-)"

@@ -28,6 +28,7 @@ COLD_FEELS_C, COLDWAVE_FEELS_C = -5.0, -12.0
 RAIN_MM, BAD_AIR_PM10, WINDY_MS = 0.5, 81.0, 9.0
 
 _cache: dict[tuple, tuple[float, WeatherOut]] = {}
+CACHE_MAX = 2000
 
 
 def derive_flags(w: WeatherOut) -> list[str]:
@@ -171,9 +172,15 @@ async def get_weather(cfg: Settings, lat: float, lng: float, at: datetime | None
             else:
                 out = await _open_meteo(client, lat, lng, at)
     except (httpx.HTTPError, ValueError, KeyError) as exc:
-        log.warning("날씨 조회 실패: %s", exc)
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        log.warning("날씨 조회 실패: %s%s", type(exc).__name__, f" (HTTP {status})" if status else "")
         return WeatherOut(source="unavailable", note=f"날씨 조회 실패({type(exc).__name__}); 날씨 없이 탐색")
     out.flags = derive_flags(out)
+    if len(_cache) >= CACHE_MAX:
+        for k in [k for k, (t, _) in _cache.items() if now - t > cfg.weather_cache_ttl_s]:
+            _cache.pop(k, None)
+        while len(_cache) >= CACHE_MAX:
+            _cache.pop(next(iter(_cache)))
     _cache[cache_key] = (now, out)
     return out
 

@@ -27,9 +27,10 @@ def mark(request: Request, kind: str, detail: str, user_id: uuid.UUID | None = N
 
 
 def client_ip(request: Request) -> str:
+    # nginx/Caddy 는 자기 앞의 주소를 목록 끝에 붙인다. 첫 항목은 클라이언트가 마음대로 넣을 수 있으니 마지막 항목을 쓴다
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
-        return fwd.split(",")[0].strip()[:64]
+        return fwd.split(",")[-1].strip()[:64]
     return (request.client.host if request.client else "")[:64]
 
 

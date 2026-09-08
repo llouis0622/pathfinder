@@ -37,6 +37,7 @@ function formatHour(hour: number): string {
   return `${h}:${String(mi).padStart(2, '0')}`
 }
 const MOBILE_QUERY = '(max-width: 860px)'
+const NO_ROUTES: RouteSearchResponse['routes'] = []   // 매 렌더마다 새 [] 를 만들면 지도가 계속 다시 맞춘다
 
 /** 공유 링크(/r/:id)로 열었을 때는 저장된 결과를 그대로 보여 준다. */
 export default function App({ sharedRequestId }: { sharedRequestId?: string } = {}) {
@@ -263,7 +264,7 @@ export default function App({ sharedRequestId }: { sharedRequestId?: string } = 
     <div className={`app app--${view}${hasSheet && !sheetOpen ? ' app--sheet-closed' : ''}`}>
       <div className="sr-only" aria-live="polite" aria-atomic="true">{announce}</div>
       <main className="map">
-        <MapView origin={origin} destination={destination} routes={result?.routes ?? []} selectedId={selected?.id ?? null} overlay={overlay} inset={inset}
+        <MapView origin={origin} destination={destination} routes={result?.routes ?? NO_ROUTES} selectedId={selected?.id ?? null} overlay={overlay} inset={inset}
           departureAt={shadeAt} onSelect={setSelectedId} onLocate={setMyLocation} onZoom={setZoom} />
         <div className="map__tools" role="radiogroup" aria-label="지도 표시">
           {([['mode', '기본'], ['grade', '경사'], ['shade', '그늘'], ['facility', '시설']] as [MapOverlay, string][]).map(([k, label]) => (

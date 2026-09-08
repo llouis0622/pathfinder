@@ -70,7 +70,8 @@ export default function SearchBar({ kind, placeholder, value, near, onSelect, al
         role="combobox"
         aria-label={kind === 'origin' ? '출발지' : '도착지'}
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
         aria-autocomplete="list"
         placeholder={placeholder}
         value={query}
@@ -96,7 +97,7 @@ export default function SearchBar({ kind, placeholder, value, near, onSelect, al
       {open && results.length > 0 && (
         <ul id={listId} className="search__list" role="listbox">
           {results.map((p, i) => (
-            <li key={p.id} role="option" aria-selected={i === active} className={`search__item${i === active ? ' is-active' : ''}`}
+            <li key={p.id} id={`${listId}-${i}`} role="option" aria-selected={i === active} className={`search__item${i === active ? ' is-active' : ''}`}
               onMouseDown={() => choose(p)}>
               <span className="search__name">{p.name}</span>
               <span className="search__addr">{p.address || p.category}</span>

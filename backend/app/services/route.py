@@ -92,7 +92,9 @@ async def search_and_store(cfg: Settings, db: AsyncSession, req: RouteSearchRequ
         try:
             result = await engine_client.search(cfg, payload)
         except engine_client.EngineError as exc:
-            record.status = "no_route" if exc.status == 422 else "error"
+            # 엔진 422 중 pydantic 검증 오류는 detail 이 목록(또는 JSON 배열 문자열)이다 → 경로 없음이 아니라 오류
+            validation = isinstance(exc.detail, list) or (isinstance(exc.detail, str) and exc.detail.lstrip().startswith("["))
+            record.status = "no_route" if exc.status == 422 and not validation else "error"
             record.error = exc.detail
             record.elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
             db.add(record)

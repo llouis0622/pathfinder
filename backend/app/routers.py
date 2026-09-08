@@ -196,6 +196,7 @@ async def auth_callback(provider: str, request: Request, code: str | None = Quer
     expected = request.cookies.get(auth.STATE_COOKIE)
     if not expected or expected != state:
         raise HTTPException(status_code=400, detail="state 가 일치하지 않습니다")
+    auth.require_strong_secret(cfg)
     profile = await auth.exchange_code(cfg, provider, code, state)
     user = await auth.upsert_user(db, profile)
     audit.mark(request, "auth", f"login:{provider}", user.id)
@@ -210,6 +211,7 @@ async def auth_dev_login(request: Request, response: Response, nickname: str = Q
                          cfg: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> UserOut:
     if not cfg.allow_dev_login:
         raise HTTPException(status_code=404, detail="Not Found")
+    auth.require_strong_secret(cfg)
     user = await auth.upsert_user(db, auth.ProviderProfile("dev", nickname, nickname, ""))
     audit.mark(request, "auth", "login:dev", user.id)
     response.set_cookie(auth.SESSION_COOKIE, auth.issue_session(cfg, user), **auth.cookie_kwargs(cfg))
